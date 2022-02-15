@@ -138,9 +138,6 @@ class NERLongformerQA(pl.LightningModule):
         print("Loading test dataset")
         return self._get_dataloader('test')
 
-    def generate(self, **kwargs):
-        return self.base_model.generate(**kwargs)
-
     def _evaluation_step(self, split, batch, batch_nb):
         """Validaton or Testing - predict output, compare it with gold, compute rouge1, 2, L, and log result"""
         # input_ids, attention_mask, start, end  = batch["input_ids"], batch["attention_mask"], batch["start_positions"], batch["end_positions"]

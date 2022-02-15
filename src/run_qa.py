@@ -1,4 +1,5 @@
 import hydra
+from omegaconf import OmegaConf
 import os
 from model import NERLongformerQA
 import pytorch_lightning as pl
@@ -6,7 +7,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from clearml import Task, StorageManager
 
 
-def train(cfg, task) -> None:
+def train(cfg, task) -> NERLongformerQA:
     checkpoint_callback = pl.callbacks.ModelCheckpoint(
         dirpath="./",
         filename="best_ner_model",
@@ -24,11 +25,7 @@ def train(cfg, task) -> None:
     return model
 
 
-def test(cfg, task) -> None:
-    trained_model_path = StorageManager.get_local_copy(cfg.trained_model_path)
-    model = NERLongformerQA.load_from_checkpoint(
-        trained_model_path, cfg=cfg, task=task)
-
+def test(cfg, model) -> list:
     trainer = pl.Trainer(gpus=1, max_epochs=cfg.num_epochs)
     results = trainer.test(model)
     return results
@@ -46,16 +43,22 @@ def hydra_main(cfg) -> float:
         task = Task.init(project_name='LongQA', task_name='longQA-NER-predict',
                          output_uri="s3://experiment-logging/storage/")
 
-    task.connect(cfg)
+    cfg_dict = OmegaConf.to_container(cfg, resolve=True)
+    task.connect(cfg_dict)
     task.set_base_docker("nvidia/cuda:11.4.0-runtime-ubuntu20.04")
-    task.execute_remotely(queue_name="compute2", exit_process=True)
+    task.execute_remotely(queue_name="compute", exit_process=True)
 
     if cfg.train:
         model = train(cfg, task)
 
     if cfg.test:
-        model
-        results = test(cfg, task)
+        if cfg.trained_model_path:
+            trained_model_path = StorageManager.get_local_copy(
+                cfg.trained_model_path)
+            model = NERLongformerQA.load_from_checkpoint(
+                trained_model_path, cfg=cfg, task=task)
+
+        results = test(cfg, model)
 
 
 if __name__ == "__main__":
