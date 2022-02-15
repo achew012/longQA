@@ -31,18 +31,3 @@ train: True
 test: False
 role_list: ["PerpInd", "PerpOrg", "Target", "Victim", "Weapon"]
 
-
-# base
-# trained_model_path = bucket_ops.get_file(
-#     remote_path="s3://experiment-logging/storage/LangGen/promptNER-QA-Base.7ffa23a05839464980272aa317353fc3/models/best_ner_model.ckpt"
-# )
-
-# squad-finetune
-# trained_model_path = bucket_ops.get_file(
-#             remote_path="s3://experiment-logging/storage/LangGen/promptNER-QA-Squad.2bfce82a26464e37a945c4696a8036f6/models/best_ner_model.ckpt"
-#             )
-
-# trained_model_path = bucket_ops.get_file(
-#             remote_path="s3://experiment-logging/storage/LangGen/MRC-NER-PRETRAINSSPANS.962f18a7e03b4c99a18972f53b667d42/models/best_ner_model.ckpt"
-#             )
-

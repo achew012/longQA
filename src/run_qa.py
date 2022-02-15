@@ -40,10 +40,10 @@ def hydra_main(cfg) -> float:
     print("Detected config file, initiating task... {}".format(cfg))
 
     if cfg.train:
-        task = Task.init(project_name='LangGen', task_name='MRC-NER-train',
+        task = Task.init(project_name='LongQA', task_name='longQA-NER-train',
                          output_uri="s3://experiment-logging/storage/")
     else:
-        task = Task.init(project_name='LangGen', task_name='MRC-NER-predict',
+        task = Task.init(project_name='LongQA', task_name='longQA-NER-predict',
                          output_uri="s3://experiment-logging/storage/")
 
     task.connect(cfg)
