@@ -18,14 +18,14 @@ class NERLongformerQA(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
         self.cfg = cfg
-        self.task = self.task
+        self.task = task
         self.clearml_logger = self.task.get_logger()
 
         clearml_data_object = ClearML_Dataset.get(dataset_name=self.cfg.clearml_dataset_name, dataset_project=self.cfg.clearml_dataset_project_name,
-                                                  dataset_tags=self.cfg.clearml_dataset_tags, only_published=True)
+                                                  dataset_tags=list(self.cfg.clearml_dataset_tags), only_published=True)
         self.dataset_path = clearml_data_object.get_local_copy()
 
-        print("CUDA: ", torch.cuda.is_available())
+        print("CUDA available: ", torch.cuda.is_available())
 
         # Load and update config then load a pretrained LEDForConditionalGeneration
         self.base_model_config = AutoConfig.from_pretrained(
@@ -109,7 +109,7 @@ class NERLongformerQA(pl.LightningModule):
         outputs = self.forward(**batch)
         return {'loss': outputs.loss}
 
-    def _get_dataloader(self, split_name, is_train):
+    def _get_dataloader(self, split_name):
         """Get training and validation dataloaders"""
         if self.cfg.debug:
             dataset_split = read_json(os.path.join(
@@ -119,7 +119,7 @@ class NERLongformerQA(pl.LightningModule):
                 self.dataset_path, "data/muc4-grit/processed/{}.json".format(split_name)))
 
         dataset = NERDataset(dataset=dataset_split,
-                             tokenizer=self.tokenizer, args=self.cfg)
+                             tokenizer=self.tokenizer, cfg=self.cfg)
 
         if split_name in ["dev", "test"]:
             return DataLoader(dataset, batch_size=self.cfg.eval_batch_size, num_workers=self.cfg.num_workers, collate_fn=NERDataset.collate_fn)
@@ -127,16 +127,16 @@ class NERLongformerQA(pl.LightningModule):
             return DataLoader(dataset, batch_size=self.cfg.batch_size, num_workers=self.cfg.num_workers, collate_fn=NERDataset.collate_fn)
 
     def train_dataloader(self):
-        print("train")
-        return self._get_dataloader('train', is_train=True)
+        print("Loading train dataset")
+        return self._get_dataloader('train')
 
     def val_dataloader(self):
-        print("dev")
-        return self._get_dataloader('dev', is_train=False)
+        print("Loading dev dataset")
+        return self._get_dataloader('dev')
 
     def test_dataloader(self):
-        print("test")
-        return self._get_dataloader('test', is_train=False)
+        print("Loading test dataset")
+        return self._get_dataloader('test')
 
     def generate(self, **kwargs):
         return self.base_model.generate(**kwargs)
