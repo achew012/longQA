@@ -109,6 +109,12 @@ class NERLongformerQA(pl.LightningModule):
         outputs = self.forward(**batch)
         return {'loss': outputs.loss}
 
+    def training_epoch_end(self, outputs):
+        total_loss = []
+        for batch in outputs:
+            total_loss.append(batch["loss"])
+        self.log("train_loss", sum(total_loss)/len(total_loss))
+
     def _get_dataloader(self, split_name):
         """Get training and validation dataloaders"""
         if self.cfg.debug:

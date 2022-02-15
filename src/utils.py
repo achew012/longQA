@@ -2,6 +2,7 @@ import jsonlines
 from collections import OrderedDict
 import re
 import json
+import os
 
 
 def to_jsonl(filename: str, file_obj):

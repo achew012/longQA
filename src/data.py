@@ -42,10 +42,6 @@ class NERDataset(Dataset):
             # expand on all labels in each role
             # qns_ans = [["who are the {} entities?".format(role_map[key].lower()), mention[1] if len(mention)>0 else 0, mention[1]+len(mention[0]) if len(mention)>0 else 0, mention[0] if len(mention)>0 else ""] for key in doc["extracts"].keys() for cluster in doc["extracts"][key] for mention in cluster]
 
-            # labels = [self.labels2idx["O"]]*(self.tokenizer.model_max_length)
-            # length_of_sequence = len(self.tokenizer.tokenize(context)) if len(self.tokenizer.tokenize(context))<=len(labels) else len(labels)
-            # labels[:length_of_sequence] = [self.labels2idx["O"]]*length_of_sequence
-
             for qns, ans_char_start, ans_char_end, mention in qns_ans:
                 context_encodings = self.tokenizer(qns, context, padding="max_length", truncation=True,
                                                    max_length=cfg.max_input_len, return_offsets_mapping=True, return_tensors="pt")
