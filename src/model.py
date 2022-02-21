@@ -8,6 +8,7 @@ from eval import eval_ceaf
 from transformers import AutoTokenizer, AutoModelForQuestionAnswering, AutoConfig, AutoModelForSeq2SeqLM, set_seed, get_linear_schedule_with_warmup
 import pytorch_lightning as pl
 from clearml import StorageManager, Dataset as ClearML_Dataset
+import ipdb
 
 
 class NERLongformerQA(pl.LightningModule):
@@ -22,7 +23,7 @@ class NERLongformerQA(pl.LightningModule):
         self.clearml_logger = self.task.get_logger()
 
         clearml_data_object = ClearML_Dataset.get(dataset_name=self.cfg.clearml_dataset_name, dataset_project=self.cfg.clearml_dataset_project_name,
-                                                  dataset_tags=list(self.cfg.clearml_dataset_tags), only_published=True)
+                                                  dataset_tags=list(self.cfg.clearml_dataset_tags), only_published=False)
         self.dataset_path = clearml_data_object.get_local_copy()
 
         print("CUDA available: ", torch.cuda.is_available())
@@ -30,7 +31,6 @@ class NERLongformerQA(pl.LightningModule):
         # Load and update config then load a pretrained LEDForConditionalGeneration
         self.base_model_config = AutoConfig.from_pretrained(
             self.cfg.model_name)
-        self.base_model_config.gradient_checkpointing = True
         # Load tokenizer and metric
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.cfg.model_name, use_fast=True)
@@ -117,12 +117,11 @@ class NERLongformerQA(pl.LightningModule):
 
     def _get_dataloader(self, split_name):
         """Get training and validation dataloaders"""
+        dataset_split = read_json(os.path.join(
+            self.dataset_path, "data/data/{}.json".format(split_name)))
+
         if self.cfg.debug:
-            dataset_split = read_json(os.path.join(
-                self.dataset_path, "data/muc4-grit/processed/{}.json".format(split_name)))[:10]
-        else:
-            dataset_split = read_json(os.path.join(
-                self.dataset_path, "data/muc4-grit/processed/{}.json".format(split_name)))
+            dataset_split = dataset_split[:10]
 
         dataset = NERDataset(dataset=dataset_split,
                              tokenizer=self.tokenizer, cfg=self.cfg)
@@ -193,7 +192,7 @@ class NERLongformerQA(pl.LightningModule):
 
             # Attempt to implement a confidence threshold
             score_list = [candidate[3] for candidate in valid_candidates]
-            top_5 = sorted(score_list, reverse=True)[:5]
+            # top_5 = sorted(score_list, reverse=True)[:5]
             threshold = max(score_list)  # -5
 
             batch_outputs.append(
@@ -323,14 +322,6 @@ class NERLongformerQA(pl.LightningModule):
                                           value=logs["test_micro_avg_precision_phi_strict"], iteration=1)
         self.clearml_logger.report_scalar(title='recall', series='test',
                                           value=logs["test_micro_avg_recall_phi_strict"], iteration=1)
-
-        # f1_list = [compute_f1(gold, pred) for pred, gold in zip(pred_list, gold_list)]
-        # mean_F1 = sum(f1_list)/len(f1_list)
-        # EM_list = [compute_exact(gold, pred) for pred, gold in zip(pred_list, gold_list)]
-        # mean_EM = sum(EM_list)/len(EM_list)
-
-        # clearml_logger.report_scalar(title='f1', series = 'test', value=mean_F1, iteration=1)
-        # clearml_logger.report_scalar(title='EM', series = 'test', value=mean_EM, iteration=1)
 
         to_jsonl("./predictions.jsonl", preds_list)
         self.task.upload_artifact(name='predictions',

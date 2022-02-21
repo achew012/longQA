@@ -2,13 +2,14 @@ import torch
 from torch.utils.data import Dataset
 import ipdb
 
-role_map = {
-    'PerpOrg': 'perpetrator organizations',
-    'PerpInd': 'perpetrator individuals',
-    'Victim': 'victims',
-    'Target': 'targets',
-    'Weapon': 'weapons'
-}
+
+# role_map = {
+#     'PerpOrg': 'perpetrator organizations',
+#     'PerpInd': 'perpetrator individuals',
+#     'Victim': 'victims',
+#     'Target': 'targets',
+#     'Weapon': 'weapons'
+# }
 
 
 class NERDataset(Dataset):
@@ -36,8 +37,25 @@ class NERDataset(Dataset):
             context = doc["doctext"]
 
             # Only take the 1st label of each role
-            qns_ans = [["who are the {} entities?".format(role_map[key].lower()), doc["extracts"][key][0][0][1] if len(doc["extracts"][key]) > 0 else 0, doc["extracts"][key][0][0][1]+len(
-                doc["extracts"][key][0][0][0]) if len(doc["extracts"][key]) > 0 else 0, doc["extracts"][key][0][0][0] if len(doc["extracts"][key]) > 0 else ""] for key in doc["extracts"].keys()]
+            # qns_ans = [["who are the {} entities?".format(role_map[key].lower()), doc["extracts"][key][0][0][1] if len(doc["extracts"][key]) > 0 else 0, doc["extracts"][key][0][0][1]+len(
+            #     doc["extracts"][key][0][0][0]) if len(doc["extracts"][key]) > 0 else 0, doc["extracts"][key][0][0][0] if len(doc["extracts"][key]) > 0 else ""] for key in doc["extracts"].keys()]
+
+            # qns_ans = [["who are the {} entities?".format(role_map[key].lower()), doc["templates"][0][key][0][0][1] if len(doc["templates"][0][key]) > 0 else 0, doc["templates"][0][key][0][0][1]+len(
+            #     doc["templates"][0][key][0][0][0]) if len(doc["templates"][0][key]) > 0 else 0, doc["templates"][0][key][0][0][0] if len(doc["templates"][0][key]) > 0 else ""] for key in doc["templates"][0].keys()]
+
+            templates = doc["templates"]
+            qns_ans = []
+            for template in templates:
+                for key in template.keys():
+                    if key != "incident_type":
+                        role = key
+                        answer = template[key][0][0][0] if len(
+                            template[key]) > 0 else ""
+                        start_idx = template[key][0][0][1] if len(
+                            template[key]) > 0 else 0
+                        end_idx = start_idx + len(answer)
+                        qns_ans.append(["who are the {} entities?".format(
+                            role), start_idx, end_idx, answer])
 
             # expand on all labels in each role
             # qns_ans = [["who are the {} entities?".format(role_map[key].lower()), mention[1] if len(mention)>0 else 0, mention[1]+len(mention[0]) if len(mention)>0 else 0, mention[0] if len(mention)>0 else ""] for key in doc["extracts"].keys() for cluster in doc["extracts"][key] for mention in cluster]
@@ -117,7 +135,7 @@ class NERDataset(Dataset):
         item['end'] = torch.tensor(self.processed_dataset["end"])[idx]
         return item
 
-    @staticmethod
+    @ staticmethod
     def collate_fn(batch):
         """
         Groups multiple examples into one batch with padding and tensorization.
