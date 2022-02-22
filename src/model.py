@@ -243,7 +243,7 @@ class NERLongformerQA(pl.LightningModule):
 
         logs = {}
         doctexts_tokens, golds = read_golds_from_test_file(os.path.join(
-            self.dataset_path, "data/muc4-grit/processed/"), self.tokenizer)
+            self.dataset_path, "data/data/test.json"), self.tokenizer)
 
         if self.cfg.debug:
             golds = {key: golds[key]
