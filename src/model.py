@@ -117,11 +117,11 @@ class NERLongformerQA(pl.LightningModule):
 
     def _get_dataloader(self, split_name):
         """Get training and validation dataloaders"""
-        dataset_split = read_json(os.path.join(
+        dataset_split = read_json_multiple_templates(os.path.join(
             self.dataset_path, "data/data/{}.json".format(split_name)))
 
         if self.cfg.debug:
-            dataset_split = dataset_split[:10]
+            dataset_split = dataset_split[:50]
 
         dataset = NERDataset(dataset=dataset_split,
                              tokenizer=self.tokenizer, cfg=self.cfg)
@@ -279,7 +279,7 @@ class NERLongformerQA(pl.LightningModule):
         for (key, doc), ent_spans in zip(predictions.items(), span_preds):
             if key not in preds:
                 preds[key] = OrderedDict()
-                for idx, role in enumerate(role_list):
+                for idx, role in enumerate(self.cfg.role_list):
                     preds[key][role] = []
                     if idx+1 > len(doc["candidates"]):
                         continue

@@ -5,8 +5,25 @@ import json
 import argparse
 from scipy.optimize import linear_sum_assignment # https://docs.scipy.org/doc/scipy-0.18.1/reference/generated/scipy.optimize.linear_sum_assignment.html
 from collections import OrderedDict
-tag2role = OrderedDict({'perp_individual_id': "PerpInd", 'perp_organization_id': "PerpOrg", 'phys_tgt_id': "Target", 'hum_tgt_name': "Victim", 'incident_instrument_id': "Weapon"})
 
+tag2role = OrderedDict({
+'location': "Location",
+'perp_individual_id': "PerpInd", 
+'perp_organization_id': "PerpOrg", 
+'phys_tgt_id': "PhysicalTarget",
+'incident_instrument_id': "Weapon",
+'hum_tgt_type_civilian': 'HumTargetCivilian',
+'hum_tgt_type_gov_official': 'HumTargetGovOfficial',
+'hum_tgt_type_military': 'HumTargetMilitary',
+'hum_tgt_type_political_figure': 'HumTargetPoliticalFigure',
+'hum_tgt_type_legal': 'HumTargetLegal',
+'hum_tgt_type_others': 'HumTargetOthers',
+'hum_tgt_kia_single': 'KIASingle',
+'hum_tgt_kia_plural': 'KIAPlural',
+'hum_tgt_kia_multiple': 'KIAMultiple',
+'hum_tgt_wia_single': 'WIASingle',
+'hum_tgt_wia_plural': 'WIAPlural',
+'hum_tgt_wia_multiple': 'WIAMultiple'})
 
 def f1(p_num, p_den, r_num, r_den, beta=1):
     p = 0 if p_den == 0 else p_num / float(p_den)
@@ -52,29 +69,34 @@ def eval_ceaf_base(preds, golds, phi_similarity, docids=[]):
             docids.append(docid)
 
     for docid in docids:
-        pred = preds[docid]
+        if docid not in preds:
+            pred = OrderedDict([ ('Location', []), ('PerpInd', []), ('PerpOrg', []), ('PhysicalTarget', []), ('Weapon', []), ('HumTargetCivilian', []), ('HumTargetGovOfficial', []), ('HumTargetMilitary', []), ('HumTargetPoliticalFigure', []), ('HumTargetLegal', []), ('HumTargetOthers', []), ('KIASingle', []), ('KIAPlural', []), ('KIAMultiple', []), ('WIASingle', []), ('WIAPlural', []), ('WIAMultiple', [])])
+        else:
+            pred = preds[docid]
+
         gold = golds[docid]
 
         for role in gold:
-            pred_clusters = []
-            gold_clusters = []
-            for entity in gold[role]:
-                gold_c = []
-                for mention in entity:
-                    gold_c.append(mention)
-                gold_clusters.append(gold_c)
+            if role != 'incident_type':
+                pred_clusters = []
+                gold_clusters = []
+                for entity in gold[role]:
+                    gold_c = []
+                    for mention in entity:
+                        gold_c.append(mention)
+                    gold_clusters.append(gold_c)
 
-            for entity in pred[role]:
-                pred_c = []
-                for mention in entity:
-                    pred_c.append(mention)
-                pred_clusters.append(pred_c)
+                for entity in pred[role]:
+                    pred_c = []
+                    for mention in entity:
+                        pred_c.append(mention)
+                    pred_clusters.append(pred_c)
 
-            pn, pd, rn, rd = ceaf(pred_clusters, gold_clusters, phi_similarity)
-            result[role]["p_num"] += pn
-            result[role]["p_den"] += pd
-            result[role]["r_num"] += rn
-            result[role]["r_den"] += rd
+                pn, pd, rn, rd = ceaf(pred_clusters, gold_clusters, phi_similarity)
+                result[role]["p_num"] += pn
+                result[role]["p_den"] += pd
+                result[role]["r_num"] += rn
+                result[role]["r_den"] += rd
 
     result["micro_avg"]["p_num"] = sum(result[role]["p_num"] for _, role in tag2role.items())
     result["micro_avg"]["p_den"] = sum(result[role]["p_den"] for _, role in tag2role.items())

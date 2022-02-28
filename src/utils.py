@@ -16,6 +16,18 @@ def read_json(jsonfile):
         file_object = [json.loads(sample) for sample in file]
     return file_object
 
+def read_json_multiple_templates(jsonfile):
+    with open(jsonfile, 'rb') as file:
+        file_object = [json.loads(sample) for sample in file]
+
+        for i in range(len(file_object)):
+            if len(file_object[i]['templates']) > 0:
+                file_object[i]['templates'] = file_object[i]['templates'][0]
+                del file_object[i]['templates']['incident_type']
+            else:
+                file_object[i]['templates'] = {"Location": [], "PerpInd": [], "PerpOrg": [], "PhysicalTarget": [], "Weapon": [], "HumTargetCivilian": [], "HumTargetGovOfficial": [], "HumTargetMilitary": [], "HumTargetPoliticalFigure": [], "HumTargetLegal": [], "HumTargetOthers": [], "KIASingle": [], "KIAPlural": [], "KIAMultiple": [], "WIASingle": [], "WIAPlural": [], "WIAMultiple": []}
+    return file_object
+
 
 def normalize_answer(s):
     """Lower text and remove punctuation, articles and extra whitespace."""
@@ -70,8 +82,14 @@ def read_golds_from_test_file(data_dir, tokenizer):
             line = json.loads(line)
             docid = line["docid"]
             # docid = int(line["docid"].split("-")[0][-1])*10000 + int(line["docid"].split("-")[-1]) # transform TST1-MUC3-0001 to int(0001)
-            doctext, extracts_raw = line["doctext"], line["extracts"]
+            doctext = line["doctext"]
+            if len(line["templates"]) > 0:
+                extracts_raw = line["templates"][0]
+                del extracts_raw['incident_type']
 
+            else:
+                extracts_raw = {  "Location": [], "PerpInd": [], "PerpOrg": [], "PhysicalTarget": [], "Weapon": [], "HumTargetCivilian": [], "HumTargetGovOfficial": [], "HumTargetMilitary": [], "HumTargetPoliticalFigure": [], "HumTargetLegal": [], "HumTargetOthers": [], "KIASingle": [], "KIAPlural": [], "KIAMultiple": [], "WIASingle": [], "WIAPlural": [], "WIAMultiple": []}
+         
             extracts = OrderedDict()
             for role, entitys_raw in extracts_raw.items():
                 extracts[role] = []

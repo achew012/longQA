@@ -20,14 +20,14 @@ attention_window: 256
 num_epochs: 10
 use_entity_embeddings: False
 model_name: allenai/longformer-base-4096 #mrm8488/longformer-base-4096-finetuned-squadv2
-trained_model_path: s3://experiment-logging/storage/LongQA/longQA-NER-train.094280cd3ff34648932298fa1fdf0c72/models/best_ner_model.ckpt
+trained_model_path: 
 data_dir: /data
 output_dir: ./saved_models/test
 clearml_dataset_project_name: datasets/muc4
 clearml_dataset_name: muc4-processed-post-eda
 clearml_dataset_tags: []
 debug: False
-train: False
+train: True
 test: True
-role_list: ["PerpInd", "PerpOrg", "Target", "Victim", "Weapon"]
-
+role_list: [ "Location", "PerpInd", "PerpOrg", "PhysicalTarget", "Weapon", "HumTargetCivilian", "HumTargetGovOfficial", "HumTargetMilitary", "HumTargetPoliticalFigure", "HumTargetLegal", "HumTargetOthers", "KIASingle", "KIAPlural", "KIAMultiple", "WIASingle", "WIAPlural", "WIAMultiple"]
+ 

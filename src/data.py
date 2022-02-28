@@ -2,15 +2,25 @@ import torch
 from torch.utils.data import Dataset
 import ipdb
 
-
-# role_map = {
-#     'PerpOrg': 'perpetrator organizations',
-#     'PerpInd': 'perpetrator individuals',
-#     'Victim': 'victims',
-#     'Target': 'targets',
-#     'Weapon': 'weapons'
-# }
-
+role_map = {
+    'Location': 'location',
+    'PerpInd': 'perpetrator individuals',
+    'PerpOrg': 'perpetrator organizations',
+    'PhysicalTarget': 'targets',
+    'Weapon': 'weapons',
+    'HumTargetCivilian': 'civilian targets',
+    'HumTargetGovOfficial': 'government official targets',
+    'HumTargetMilitary': 'military targets',
+    'HumTargetPoliticalFigure': 'political figure targets',
+    'HumTargetLegal': 'legal targets',
+    'HumTargetOthers': 'other targets',
+    'KIASingle': 'number of single deaths',
+    'KIAPlural': 'number of plural deaths',
+    'KIAMultiple': 'number of multiple deaths',
+    'WIASingle': 'number of single injured',
+    'WIAPlural': 'number of plural injured',
+    'WIAMultiple': 'number of multiple injured'
+}
 
 class NERDataset(Dataset):
     # doc_list
@@ -43,19 +53,21 @@ class NERDataset(Dataset):
             # qns_ans = [["who are the {} entities?".format(role_map[key].lower()), doc["templates"][0][key][0][0][1] if len(doc["templates"][0][key]) > 0 else 0, doc["templates"][0][key][0][0][1]+len(
             #     doc["templates"][0][key][0][0][0]) if len(doc["templates"][0][key]) > 0 else 0, doc["templates"][0][key][0][0][0] if len(doc["templates"][0][key]) > 0 else ""] for key in doc["templates"][0].keys()]
 
-            templates = doc["templates"]
-            qns_ans = []
-            for template in templates:
-                for key in template.keys():
-                    if key != "incident_type":
-                        role = key
-                        answer = template[key][0][0][0] if len(
-                            template[key]) > 0 else ""
-                        start_idx = template[key][0][0][1] if len(
-                            template[key]) > 0 else 0
-                        end_idx = start_idx + len(answer)
-                        qns_ans.append(["who are the {} entities?".format(
-                            role), start_idx, end_idx, answer])
+            qns_ans = [["who are the {} entities?".format(role_map[key].lower()), doc["templates"][key][0][0][1] if len(doc["templates"][key]) > 0 else 0, doc["templates"][key][0][0][1]+len(doc["templates"][key][0][0][0]) if len(doc["templates"][key]) > 0 else 0, doc["templates"][key][0][0][0] if len(doc["templates"][key]) > 0 else ""] for key in doc["templates"].keys()]
+           
+            # templates = doc["templates"]
+            # qns_ans = []
+            # for template in templates:
+            #     for key in template.keys():
+            #         if key != "incident_type":
+            #             role = key
+            #             answer = template[key][0][0][0] if len(
+            #                 template[key]) > 0 else ""
+            #             start_idx = template[key][0][0][1] if len(
+            #                 template[key]) > 0 else 0
+            #             end_idx = start_idx + len(answer)
+            #             qns_ans.append(["who are the {} entities?".format(
+            #                 role), start_idx, end_idx, answer])
 
             # expand on all labels in each role
             # qns_ans = [["who are the {} entities?".format(role_map[key].lower()), mention[1] if len(mention)>0 else 0, mention[1]+len(mention[0]) if len(mention)>0 else 0, mention[0] if len(mention)>0 else ""] for key in doc["extracts"].keys() for cluster in doc["extracts"][key] for mention in cluster]
