@@ -19,14 +19,14 @@ def train(cfg, task) -> NERLongformerQA:
     )
 
     model = NERLongformerQA(cfg, task)
-    trainer = pl.Trainer(gpus=1, max_epochs=cfg.num_epochs,
+    trainer = pl.Trainer(gpus=cfg.gpu, max_epochs=cfg.num_epochs,
                          callbacks=[checkpoint_callback])
     trainer.fit(model)
     return model
 
 
 def test(cfg, model) -> list:
-    trainer = pl.Trainer(gpus=1, max_epochs=cfg.num_epochs)
+    trainer = pl.Trainer(gpus=cfg.gpu, max_epochs=cfg.num_epochs)
     results = trainer.test(model)
     return results
 
