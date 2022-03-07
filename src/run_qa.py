@@ -1,10 +1,73 @@
 import hydra
 from omegaconf import OmegaConf
+from typing import Dict, Any
+import ast
 import os
-from model import NERLongformerQA
+from torch.utils.data import DataLoader
+from model.model import NERLongformerQA
+from data.data import NERDataset
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint
-from clearml import Task, StorageManager
+from transformers import AutoTokenizer
+from clearml import Task, StorageManager, Dataset as ClearML_Dataset
+from common.utils import *
+
+Task.force_requirements_env_freeze(force=True, requirements_file="requirements.txt")
+Task.add_requirements("git+https://github.com/huggingface/datasets.git")
+
+
+def get_clearml_params(task: Task) -> Dict[str, Any]:
+    """
+    returns task params as a dictionary
+    the values are casted in the required Python type
+    """
+    string_params = task.get_parameters_as_dict()
+    clean_params = {}
+    for k, v in string_params["General"].items():
+        try:
+            # ast.literal eval cannot read empty strings + actual strings
+            # i.e. ast.literal_eval("True") -> True, ast.literal_eval("i am cute") -> error
+            clean_params[k] = ast.literal_eval(v)
+        except:
+            # if exception is triggered, it's an actual string, or empty string
+            clean_params[k] = v
+    return OmegaConf.create(clean_params)
+
+
+def get_dataloader(split_name, cfg):
+    """Get training and validation dataloaders"""
+    clearml_data_object = ClearML_Dataset.get(
+        dataset_name=cfg.clearml_dataset_name,
+        dataset_project=cfg.clearml_dataset_project_name,
+        dataset_tags=list(cfg.clearml_dataset_tags),
+        # only_published=True,
+    )
+    dataset_path = clearml_data_object.get_local_copy()
+
+    dataset_split = read_json_multiple_templates(
+        os.path.join(dataset_path, "data/data/{}.json".format(split_name))
+    )
+
+    if cfg.debug:
+        dataset_split = dataset_split[:50]
+
+    tokenizer = AutoTokenizer.from_pretrained(cfg.model_name, use_fast=True)
+    dataset = NERDataset(dataset=dataset_split, tokenizer=tokenizer, cfg=cfg)
+
+    if split_name in ["dev", "test"]:
+        return DataLoader(
+            dataset,
+            batch_size=cfg.eval_batch_size,
+            num_workers=cfg.num_workers,
+            collate_fn=NERDataset.collate_fn,
+        )
+    else:
+        return DataLoader(
+            dataset,
+            batch_size=cfg.batch_size,
+            num_workers=cfg.num_workers,
+            collate_fn=NERDataset.collate_fn,
+        )
 
 
 def train(cfg, task) -> NERLongformerQA:
@@ -15,13 +78,16 @@ def train(cfg, task) -> NERLongformerQA:
         mode="min",
         save_top_k=1,
         save_weights_only=True,
-        period=5
+        period=5,
     )
+    train_loader = get_dataloader("train", cfg)
+    val_loader = get_dataloader("dev", cfg)
 
     model = NERLongformerQA(cfg, task)
-    trainer = pl.Trainer(gpus=cfg.gpu, max_epochs=cfg.num_epochs,
-                         callbacks=[checkpoint_callback])
-    trainer.fit(model)
+    trainer = pl.Trainer(
+        gpus=cfg.gpu, max_epochs=cfg.num_epochs, callbacks=[checkpoint_callback]
+    )
+    trainer.fit(model, train_loader, val_loader)
     return model
 
 
@@ -31,32 +97,39 @@ def test(cfg, model) -> list:
     return results
 
 
-@ hydra.main(config_path=os.path.join("..", "config"), config_name="config")
+@hydra.main(config_path=os.path.join("..", "config"), config_name="config")
 def hydra_main(cfg) -> float:
 
     print("Detected config file, initiating task... {}".format(cfg))
 
     if cfg.train:
-        task = Task.init(project_name='LongQA', task_name='longQA-NER-train',
-                         output_uri="s3://experiment-logging/storage/")
+        task = Task.init(
+            project_name="LongQA",
+            task_name="longQA-NER-train",
+            output_uri="s3://experiment-logging/storage/",
+        )
     else:
-        task = Task.init(project_name='LongQA', task_name='longQA-NER-predict',
-                         output_uri="s3://experiment-logging/storage/")
+        task = Task.init(
+            project_name="LongQA",
+            task_name="longQA-NER-predict",
+            output_uri="s3://experiment-logging/storage/",
+        )
 
     cfg_dict = OmegaConf.to_container(cfg, resolve=True)
     task.connect(cfg_dict)
     task.set_base_docker("nvidia/cuda:11.4.0-runtime-ubuntu20.04")
     task.execute_remotely(queue_name="compute", exit_process=True)
+    cfg = get_clearml_params(task)
 
     if cfg.train:
         model = train(cfg, task)
 
     if cfg.test:
         if cfg.trained_model_path:
-            trained_model_path = StorageManager.get_local_copy(
-                cfg.trained_model_path)
+            trained_model_path = StorageManager.get_local_copy(cfg.trained_model_path)
             model = NERLongformerQA.load_from_checkpoint(
-                trained_model_path, cfg=cfg, task=task)
+                trained_model_path, cfg=cfg, task=task
+            )
 
         results = test(cfg, model)
 

@@ -2,3 +2,4 @@ transformers==4.1.0
 pytorch-lightning==1.0.8
 datasets
 ipdb
+hydra-core
