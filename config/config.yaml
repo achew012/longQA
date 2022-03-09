@@ -8,8 +8,9 @@ num_workers: 4
 limit_val_batches: 0.005
 limit_test_batches: 0.005
 limit_train_batches: 0.002
-max_output_len: 64
 val_every: 0.33
+max_prediction_span: 20
+max_output_len: 64
 max_input_len: 470
 batch_size: 8
 eval_batch_size: 8

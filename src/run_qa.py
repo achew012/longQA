@@ -1,6 +1,6 @@
 import hydra
 from omegaconf import OmegaConf
-from typing import Dict, Any
+from typing import Dict, Any, List, Tuple
 import ast
 import os
 from torch.utils.data import DataLoader
@@ -12,7 +12,8 @@ from transformers import AutoTokenizer
 from clearml import Task, StorageManager, Dataset as ClearML_Dataset
 from common.utils import *
 
-Task.force_requirements_env_freeze(force=True, requirements_file="requirements.txt")
+Task.force_requirements_env_freeze(
+    force=True, requirements_file="requirements.txt")
 Task.add_requirements("git+https://github.com/huggingface/datasets.git")
 
 
@@ -34,7 +35,7 @@ def get_clearml_params(task: Task) -> Dict[str, Any]:
     return OmegaConf.create(clean_params)
 
 
-def get_dataloader(split_name, cfg):
+def get_dataloader(split_name, cfg) -> DataLoader:
     """Get training and validation dataloaders"""
     clearml_data_object = ClearML_Dataset.get(
         dataset_name=cfg.clearml_dataset_name,
@@ -49,7 +50,7 @@ def get_dataloader(split_name, cfg):
     )
 
     if cfg.debug:
-        dataset_split = dataset_split[:50]
+        dataset_split = dataset_split[:20]
 
     tokenizer = AutoTokenizer.from_pretrained(cfg.model_name, use_fast=True)
     dataset = NERDataset(dataset=dataset_split, tokenizer=tokenizer, cfg=cfg)
@@ -85,15 +86,17 @@ def train(cfg, task) -> NERLongformerQA:
 
     model = NERLongformerQA(cfg, task)
     trainer = pl.Trainer(
-        gpus=cfg.gpu, max_epochs=cfg.num_epochs, callbacks=[checkpoint_callback]
+        gpus=cfg.gpu, max_epochs=cfg.num_epochs, callbacks=[
+            checkpoint_callback]
     )
     trainer.fit(model, train_loader, val_loader)
     return model
 
 
-def test(cfg, model) -> list:
+def test(cfg, model) -> List:
+    test_loader = get_dataloader("test", cfg)
     trainer = pl.Trainer(gpus=cfg.gpu, max_epochs=cfg.num_epochs)
-    results = trainer.test(model)
+    results = trainer.test(model, test_loader)
     return results
 
 
@@ -126,7 +129,8 @@ def hydra_main(cfg) -> float:
 
     if cfg.test:
         if cfg.trained_model_path:
-            trained_model_path = StorageManager.get_local_copy(cfg.trained_model_path)
+            trained_model_path = StorageManager.get_local_copy(
+                cfg.trained_model_path)
             model = NERLongformerQA.load_from_checkpoint(
                 trained_model_path, cfg=cfg, task=task
             )

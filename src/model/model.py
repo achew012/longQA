@@ -40,7 +40,8 @@ class NERLongformerQA(pl.LightningModule):
         print("CUDA available: ", torch.cuda.is_available())
 
         # Load and update config then load a pretrained LEDForConditionalGeneration
-        self.base_model_config = AutoConfig.from_pretrained(self.cfg.model_name)
+        self.base_model_config = AutoConfig.from_pretrained(
+            self.cfg.model_name)
         # Load tokenizer and metric
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.cfg.model_name, use_fast=True
@@ -79,13 +80,15 @@ class NERLongformerQA(pl.LightningModule):
         question_separators = (input_ids == 2).nonzero(as_tuple=True)
         sep_indices_batch = [
             torch.masked_select(
-                question_separators[1], torch.eq(question_separators[0], batch_num)
+                question_separators[1], torch.eq(
+                    question_separators[0], batch_num)
             )[0]
             for batch_num in range(batch_size)
         ]
 
         for batch_num in range(batch_size):
-            global_attention_mask[batch_num, : sep_indices_batch[batch_num]] = 1
+            global_attention_mask[batch_num,
+                                  : sep_indices_batch[batch_num]] = 1
 
         return global_attention_mask
 
@@ -106,7 +109,8 @@ class NERLongformerQA(pl.LightningModule):
                 input_ids=input_ids,
                 # inputs_embeds = inputs_embeds,
                 attention_mask=attention_mask,  # mask padding tokens
-                global_attention_mask=self._set_global_attention_mask(input_ids),
+                global_attention_mask=self._set_global_attention_mask(
+                    input_ids),
                 start_positions=start,
                 end_positions=end,
                 output_hidden_states=True,
@@ -191,12 +195,13 @@ class NERLongformerQA(pl.LightningModule):
         question_separators = (batch["input_ids"] == 2).nonzero(as_tuple=True)
         sep_indices_batch = [
             torch.masked_select(
-                question_separators[1], torch.eq(question_separators[0], batch_num)
+                question_separators[1], torch.eq(
+                    question_separators[0], batch_num)
             )[0]
             for batch_num in range(batch_size)
         ]
         question_indices_batch = [
-            [i + 1 for i, token in enumerate(tokens[1 : sep_idx + 1])]
+            [i + 1 for i, token in enumerate(tokens[1: sep_idx + 1])]
             for tokens, sep_idx in zip(batch["input_ids"], sep_indices_batch)
         ]
         batch_outputs = []
@@ -240,7 +245,7 @@ class NERLongformerQA(pl.LightningModule):
                         continue
                     elif end_index < start_index:
                         continue
-                    elif (end_index - start_index) > 30:
+                    elif (end_index - start_index) > self.cfg.max_prediction_span:
                         continue
                     elif (start_index) > (torch.count_nonzero(attention_mask)):
                         continue
@@ -255,7 +260,8 @@ class NERLongformerQA(pl.LightningModule):
                             (
                                 start_index.item(),
                                 end_index.item(),
-                                self.tokenizer.decode(tokens[start_index:end_index]),
+                                self.tokenizer.decode(
+                                    tokens[start_index:end_index]),
                                 (start_score + end_score).item(),
                             )
                         )
@@ -268,11 +274,11 @@ class NERLongformerQA(pl.LightningModule):
             batch_outputs.append(
                 {
                     "docid": docid,
-                    "qns": self.tokenizer.decode(tokens[1 : len(question_indices)]),
+                    "qns": self.tokenizer.decode(tokens[1: len(question_indices)]),
                     "gold_mention": gold_mention,
                     "context": self.tokenizer.decode(
                         torch.masked_select(tokens, torch.gt(attention_mask, 0))[
-                            1 + len(question_indices) :
+                            1 + len(question_indices):
                         ]
                     ),
                     "start_gold": start_gold.item(),
@@ -312,8 +318,10 @@ class NERLongformerQA(pl.LightningModule):
 
         # pred_list = []
 
-        span_clf_task = self.task.get_task(task_id="87a8509b524040e6bc7f52cdb8a0d0ce")
-        span_preds = read_json(span_clf_task.artifacts["predictions"].get_local_copy())
+        span_clf_task = self.task.get_task(
+            task_id="87a8509b524040e6bc7f52cdb8a0d0ce")
+        span_preds = read_json(
+            span_clf_task.artifacts["predictions"].get_local_copy())
 
         logs = {}
         doctexts_tokens, golds = read_golds_from_test_file(
@@ -376,7 +384,8 @@ class NERLongformerQA(pl.LightningModule):
                             if candidate[2] == "</s>":
                                 continue
                             else:
-                                preds[key][role] = [[candidate[2].replace("</s>", "")]]
+                                preds[key][role] = [
+                                    [candidate[2].replace("</s>", "")]]
                                 # preds[key][role] = [[candidate]]
 
         # ipdb.set_trace()
