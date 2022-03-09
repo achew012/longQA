@@ -32,4 +32,4 @@ debug: False
 train: True
 test: True
 role_list: [ "Location", "PerpInd", "PerpOrg", "PhysicalTarget", "Weapon", "HumTargetCivilian", "HumTargetGovOfficial", "HumTargetMilitary", "HumTargetPoliticalFigure", "HumTargetLegal", "HumTargetOthers", "KIASingle", "KIAPlural", "KIAMultiple", "WIASingle", "WIAPlural", "WIAMultiple"]
- 
+classifier_outputs: []
