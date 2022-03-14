@@ -1,20 +1,22 @@
-import hydra
-from omegaconf import OmegaConf
-from typing import Dict, Any, List, Tuple
-import ast
-import os
-from torch.utils.data import DataLoader
-from model.model import NERLongformerQA
-from data.data import NERDataset
-import pytorch_lightning as pl
-from pytorch_lightning.callbacks import ModelCheckpoint
-from transformers import AutoTokenizer
-from clearml import Task, StorageManager, Dataset as ClearML_Dataset
 from common.utils import *
+from transformers import AutoTokenizer
+from pytorch_lightning.callbacks import ModelCheckpoint
+import pytorch_lightning as pl
+from data.data import NERDataset
+from model.model import NERLongformerQA
+from torch.utils.data import DataLoader
+import os
+import ast
+from typing import Dict, Any, List, Tuple
+from omegaconf import OmegaConf
+import hydra
+from clearml import Task, StorageManager, Dataset as ClearML_Dataset
 
 Task.force_requirements_env_freeze(
     force=True, requirements_file="requirements.txt")
 Task.add_requirements("git+https://github.com/huggingface/datasets.git")
+Task.add_requirements("hydra-core")
+Task.add_requirements("pytorch-lightning")
 
 
 def get_clearml_params(task: Task) -> Dict[str, Any]:
@@ -79,7 +81,7 @@ def train(cfg, task) -> NERLongformerQA:
         mode="min",
         save_top_k=1,
         save_weights_only=True,
-        period=5,
+        every_n_epochs=5,
     )
     train_loader = get_dataloader("train", cfg)
     val_loader = get_dataloader("dev", cfg)
