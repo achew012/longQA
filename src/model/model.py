@@ -2,6 +2,7 @@ import os
 from torch.utils.data import DataLoader
 from torch import nn
 import torch
+from typing import List, Any, Dict
 
 # from data import NERDataset
 from common.utils import *
@@ -178,6 +179,51 @@ class NERLongformerQA(pl.LightningModule):
     #     print("Loading test dataset")
     #     return self._get_dataloader('test')
 
+    def extract_answer_spans(self,
+                             start_candidates,
+                             start_candidates_logits,
+                             end_candidates,
+                             end_candidates_logits,
+                             question_indices,
+                             tokens,
+                             attention_mask
+                             ) -> List:
+
+        valid_candidates = []
+        # For each candidate in sample
+        for start_index, start_score in zip(
+            start_candidates, start_candidates_logits
+        ):
+            for end_index, end_score in zip(end_candidates, end_candidates_logits):
+                # throw out invalid predictions
+                if start_index in question_indices:
+                    continue
+                elif end_index in question_indices:
+                    continue
+                elif end_index < start_index:
+                    continue
+                elif (end_index - start_index) > self.cfg.max_prediction_span:
+                    continue
+                elif (start_index) > (torch.count_nonzero(attention_mask)):
+                    continue
+
+                if start_index == 0:
+                    if len(valid_candidates) < 1:
+                        valid_candidates.append(
+                            (start_index.item(), end_index.item(), "", 0)
+                        )
+                else:
+                    valid_candidates.append(
+                        (
+                            start_index.item(),
+                            end_index.item(),
+                            self.tokenizer.decode(
+                                tokens[start_index:end_index]),
+                            (start_score + end_score).item(),
+                        )
+                    )
+        return valid_candidates
+
     def _evaluation_step(self, split, batch, batch_nb):
         """Validaton or Testing - predict output, compare it with gold, compute rouge1, 2, L, and log result"""
         # input_ids, attention_mask, start, end  = batch["input_ids"], batch["attention_mask"], batch["start_positions"], batch["end_positions"]
@@ -232,44 +278,18 @@ class NERLongformerQA(pl.LightningModule):
             docids,
             gold_mentions,
         ):
-            valid_candidates = []
-            # For each candidate in sample
-            for start_index, start_score in zip(
-                start_candidates, start_candidates_logits
-            ):
-                for end_index, end_score in zip(end_candidates, end_candidates_logits):
-                    # throw out invalid predictions
-                    if start_index in question_indices:
-                        continue
-                    elif end_index in question_indices:
-                        continue
-                    elif end_index < start_index:
-                        continue
-                    elif (end_index - start_index) > self.cfg.max_prediction_span:
-                        continue
-                    elif (start_index) > (torch.count_nonzero(attention_mask)):
-                        continue
-
-                    if start_index == 0:
-                        if len(valid_candidates) < 1:
-                            valid_candidates.append(
-                                (start_index.item(), end_index.item(), "", 0)
-                            )
-                    else:
-                        valid_candidates.append(
-                            (
-                                start_index.item(),
-                                end_index.item(),
-                                self.tokenizer.decode(
-                                    tokens[start_index:end_index]),
-                                (start_score + end_score).item(),
-                            )
-                        )
-
+            valid_candidates = self.extract_answer_spans(start_candidates,
+                                                         start_candidates_logits,
+                                                         end_candidates,
+                                                         end_candidates_logits,
+                                                         question_indices,
+                                                         tokens,
+                                                         attention_mask
+                                                         )
             # Attempt to implement a confidence threshold
             score_list = [candidate[3] for candidate in valid_candidates]
             # top_5 = sorted(score_list, reverse=True)[:5]
-            threshold = max(score_list)  # -5
+            threshold = max(score_list)
 
             batch_outputs.append(
                 {
@@ -438,6 +458,77 @@ class NERLongformerQA(pl.LightningModule):
             name="predictions", artifact_object="./predictions.jsonl"
         )
         return {"results": results}
+
+    def predict_step(self, batch, batch_nb):
+        docids = batch.pop("docid", None)
+        outputs = self(**batch)
+        candidates_start_batch = torch.topk(outputs.start_logits, 20)
+        candidates_end_batch = torch.topk(outputs.end_logits, 20)
+        batch_size = batch["input_ids"].size()[0]
+        question_separators = (batch["input_ids"] == 2).nonzero(as_tuple=True)
+        sep_indices_batch = [
+            torch.masked_select(
+                question_separators[1], torch.eq(
+                    question_separators[0], batch_num)
+            )[0]
+            for batch_num in range(batch_size)
+        ]
+        question_indices_batch = [
+            [i + 1 for i, token in enumerate(tokens[1: sep_idx + 1])]
+            for tokens, sep_idx in zip(batch["input_ids"], sep_indices_batch)
+        ]
+        batch_outputs = []
+
+        # For each sample in batch
+        for (
+            start_candidates,
+            start_candidates_logits,
+            end_candidates,
+            end_candidates_logits,
+            tokens,
+            question_indices,
+            attention_mask,
+            docid,
+        ) in zip(
+            candidates_start_batch.indices,
+            candidates_start_batch.values,
+            candidates_end_batch.indices,
+            candidates_end_batch.values,
+            batch["input_ids"],
+            question_indices_batch,
+            batch["attention_mask"],
+            docids,
+        ):
+            valid_candidates = self.extract_answer_spans(start_candidates,
+                                                         start_candidates_logits,
+                                                         end_candidates,
+                                                         end_candidates_logits,
+                                                         question_indices,
+                                                         tokens,
+                                                         attention_mask
+                                                         )
+
+            score_list = [candidate[3] for candidate in valid_candidates]
+            threshold = max(score_list)
+
+            batch_outputs.append(
+                {
+                    "docid": docid,
+                    "qns": self.tokenizer.decode(tokens[1: len(question_indices)]),
+                    "context": self.tokenizer.decode(
+                        torch.masked_select(tokens, torch.gt(attention_mask, 0))[
+                            1 + len(question_indices):
+                        ]
+                    ),
+                    "candidates": [
+                        candidate
+                        for candidate in valid_candidates
+                        if candidate[3] == threshold
+                    ],
+                }
+            )
+
+        return {"results": batch_outputs}
 
     def configure_optimizers(self):
         """Configure the optimizer and the learning rate scheduler"""

@@ -9,26 +9,26 @@ limit_val_batches: 0.005
 limit_test_batches: 0.005
 limit_train_batches: 0.002
 val_every: 0.33
-max_prediction_span: 20
-max_output_len: 64
-max_input_len: 470
+max_prediction_span: 25
+max_output_len: 128
+max_input_len: 1024
 batch_size: 8
 eval_batch_size: 8
 grad_accum: 1
 fp16: False
 grad_ckpt: True
 attention_window: 256
-num_epochs: 10
+num_epochs: 1
 use_entity_embeddings: False
 model_name: allenai/longformer-base-4096 #mrm8488/longformer-base-4096-finetuned-squadv2
 trained_model_path: 
 data_dir: /data
-output_dir: ./saved_models/test
+output_dir: /saved_models/
 clearml_dataset_project_name: datasets/muc4
 clearml_dataset_name: muc4-processed-post-eda
 clearml_dataset_tags: []
 gpu: 1
-debug: False
+debug: True
 train: True
 test: True
 role_list: [ "Location", "PerpInd", "PerpOrg", "PhysicalTarget", "Weapon", "HumTargetCivilian", "HumTargetGovOfficial", "HumTargetMilitary", "HumTargetPoliticalFigure", "HumTargetLegal", "HumTargetOthers", "KIASingle", "KIAPlural", "KIAMultiple", "WIASingle", "WIAPlural", "WIAMultiple"]
