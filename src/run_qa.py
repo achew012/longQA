@@ -48,7 +48,7 @@ def get_dataloader(split_name, cfg) -> DataLoader:
     dataset_path = clearml_data_object.get_local_copy()
 
     dataset_split = read_json_multiple_templates(
-        os.path.join(dataset_path, "data/data/{}.json".format(split_name))
+        os.path.join(dataset_path, "{}.json".format(split_name))
     )
 
     if cfg.debug:
@@ -81,7 +81,8 @@ def train(cfg, task) -> NERLongformerQA:
         mode="min",
         save_top_k=1,
         save_weights_only=True,
-        every_n_epochs=5,
+        period=5,
+        # every_n_epochs=5,
     )
     train_loader = get_dataloader("train", cfg)
     val_loader = get_dataloader("dev", cfg)
@@ -122,8 +123,8 @@ def hydra_main(cfg) -> float:
 
     cfg_dict = OmegaConf.to_container(cfg, resolve=True)
     task.connect(cfg_dict)
-    task.set_base_docker("nvidia/cuda:11.4.0-runtime-ubuntu20.04")
-    task.execute_remotely(queue_name="compute", exit_process=True)
+    # task.set_base_docker("nvidia/cuda:11.4.0-runtime-ubuntu20.04")
+    # task.execute_remotely(queue_name="compute", exit_process=True)
     cfg = get_clearml_params(task)
 
     if cfg.train:

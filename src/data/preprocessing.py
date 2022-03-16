@@ -1,34 +1,74 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
+from xmlrpc.client import Boolean
 import ipdb
 
 
+def get_question(role):
+    question_dict = {
+        "event": "what is the event that happened?",
+        "target": "what was the target of the event?",
+        "victim": "who is the victim?",
+        "perpetrator individuals": "who attacked the victim?",
+        "weapons": "what weapon was used to attack the victim?",
+        "kia": "how many victims were killed?",
+        "wia": "how many victims were injured?",
+        "perpetrator organizations": "what organization did the attacker belong to?",
+        "location": "where did the event happen?",
+        "civilian targets": "Were there civilian victims?",
+        "government official targets": "Were government officials attacked?",
+        "military targets": "Were there military casualties?",
+    }
+
+    if "deaths" in role:
+        role = "kia"
+        return question_dict[role]
+
+    elif "injured" in role:
+        role = "wia"
+        return question_dict[role]
+
+    elif role in question_dict.keys():
+        return question_dict[role]
+
+    else:
+        return None
+
+
+def is_existing_question(natural_question: str, qns_ans: List) -> Tuple[bool, Any]:
+    for idx, question_group in enumerate(qns_ans):
+        if natural_question in question_group[0]:
+            return (True, idx)
+    return (False, -1)
+
+
 def generate_questions_from_template(doc: Dict, role_map: Dict) -> List[List]:
-    # Only take the 1st label of each role
-    # qns_ans = [["who are the {} entities?".format(role_map[key].lower()), doc["extracts"][key][0][0][1] if len(doc["extracts"][key]) > 0 else 0, doc["extracts"][key][0][0][1]+len(
-    #     doc["extracts"][key][0][0][0]) if len(doc["extracts"][key]) > 0 else 0, doc["extracts"][key][0][0][0] if len(doc["extracts"][key]) > 0 else ""] for key in doc["extracts"].keys()]
+    qns_ans = []
+    for key in doc["templates"].keys():
 
-    # qns_ans = [["who are the {} entities?".format(role_map[key].lower()), doc["templates"][0][key][0][0][1] if len(doc["templates"][0][key]) > 0 else 0, doc["templates"][0][key][0][0][1]+len(
-    #     doc["templates"][0][key][0][0][0]) if len(doc["templates"][0][key]) > 0 else 0, doc["templates"][0][key][0][0][0] if len(doc["templates"][0][key]) > 0 else ""] for key in doc["templates"][0].keys()]
+        # ipdb.set_trace()
 
-    qns_ans = [["who are the {} entities?".format(role_map[key].lower()), doc["templates"][key][0][0][1] if len(doc["templates"][key]) > 0 else 0, doc["templates"][key][0][0][1]+len(
-        doc["templates"][key][0][0][0]) if len(doc["templates"][key]) > 0 else 0, doc["templates"][key][0][0][0] if len(doc["templates"][key]) > 0 else ""] for key in doc["templates"].keys()]
+        natural_question = get_question(role_map[key].lower())
+        if natural_question:
+            if len(doc["templates"][key]) > 0:
+                mention = doc["templates"][key][0][0][0]
+                start_idx = doc["templates"][key][0][0][1]
+                end_idx = start_idx + len(mention)
+            else:
+                mention = ""
+                start_idx = 0
+                end_idx = 0
 
-    # templates = doc["templates"]
-    # qns_ans = []
-    # for template in templates:
-    #     for key in template.keys():
-    #         if key != "incident_type":
-    #             role = key
-    #             answer = template[key][0][0][0] if len(
-    #                 template[key]) > 0 else ""
-    #             start_idx = template[key][0][0][1] if len(
-    #                 template[key]) > 0 else 0
-    #             end_idx = start_idx + len(answer)
-    #             qns_ans.append(["who are the {} entities?".format(
-    #                 role), start_idx, end_idx, answer])
+            has_existing_idx, existing_idx = is_existing_question(
+                natural_question, qns_ans)
+            # Appends question-answer pair to list. if question exist, append mentions to it.
+            if has_existing_idx:
+                if (start_idx, end_idx, mention) not in qns_ans[existing_idx][1]:
+                    qns_ans[existing_idx] = [qns_ans[existing_idx][0], qns_ans[existing_idx][1] + [
+                        (start_idx, end_idx, mention)]]
+            else:
+                qns_ans.append(
+                    [natural_question, [(start_idx, end_idx, mention)]])
 
-    # expand on all labels in each role
-    # qns_ans = [["who are the {} entities?".format(role_map[key].lower()), mention[1] if len(mention)>0 else 0, mention[1]+len(mention[0]) if len(mention)>0 else 0, mention[0] if len(mention)>0 else ""] for key in doc["extracts"].keys() for cluster in doc["extracts"][key] for mention in cluster]
     return qns_ans
 
 

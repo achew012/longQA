@@ -32,6 +32,7 @@ class NERDataset(Dataset):
         self.tokenizer = tokenizer
         if "templates" in dataset[0].keys():
             self.train = True
+            ipdb.set_trace()
             self.processed_dataset = process_train_data(
                 dataset, self.tokenizer, cfg, role_map)
         else:

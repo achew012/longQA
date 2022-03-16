@@ -99,11 +99,11 @@ class NERLongformerQA(pl.LightningModule):
             batch["attention_mask"],
         )
 
-        # span_embeds = self.span_embeds(input_ids, attention_mask).last_hidden_state
-        # inputs_embeds = torch.sum(torch.stack([self.base_model.longformer.embeddings(input_ids), span_embeds], dim=0), dim=0)
+        # history embeds
 
         if "start_positions" in batch.keys():
             start, end = batch["start_positions"], batch["end_positions"]
+
             self.base_model.longformer.embeddings(input_ids)
 
             outputs = self.base_model(
