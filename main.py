@@ -24,6 +24,12 @@ clf_base_task = Task.get_task(
     task_filter={"status": ["published"]},
 )
 
+# qg_base_task = Task.get_task(
+#     project_name=CLF_TASK_PROJECT_NAME,
+#     task_name=CLF_TASK_NAME,
+#     task_filter={"status": ["published"]},
+# )
+
 qa_base_task = Task.get_task(
     project_name=QA_PROJECT_NAME,
     task_name=QA_TASK_NAME,
@@ -36,10 +42,10 @@ pipe.add_step(
 )
 
 pipe.add_step(
-    name="qa",
+    name="qaqg",
     base_task_id=qa_base_task.id,
-    parameter_override={
-        # "General/clearml_dataset_project_name": ${dataset_etl.artifacts.data.url}
+    # parameter_override={
+        # "General/clearml_dataset_project_name": ${qg.artifacts.predictions.url}
         # "General/clearml_dataset_project_name": ,
         # "General/clearml_dataset_name": "dataset_load_csv",
         # "General/event_type: ${document_clf.artifacts.data.url}"

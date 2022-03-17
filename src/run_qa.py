@@ -47,12 +47,16 @@ def get_dataloader(split_name, cfg) -> DataLoader:
     )
     dataset_path = clearml_data_object.get_local_copy()
 
-    dataset_split = read_json_multiple_templates(
+    # dataset_split = read_json_multiple_templates(
+    #     os.path.join(dataset_path, "{}.json".format(split_name))
+    # )
+
+    dataset_split = read_json(
         os.path.join(dataset_path, "{}.json".format(split_name))
     )
 
     if cfg.debug:
-        dataset_split = dataset_split[:20]
+        dataset_split = dataset_split[:25]
 
     tokenizer = AutoTokenizer.from_pretrained(cfg.model_name, use_fast=True)
     dataset = NERDataset(dataset=dataset_split, tokenizer=tokenizer, cfg=cfg)
@@ -60,14 +64,14 @@ def get_dataloader(split_name, cfg) -> DataLoader:
     if split_name in ["dev", "test"]:
         return DataLoader(
             dataset,
-            batch_size=cfg.eval_batch_size,
+            batch_size=cfg.template_size,
             num_workers=cfg.num_workers,
             collate_fn=NERDataset.collate_fn,
         )
     else:
         return DataLoader(
             dataset,
-            batch_size=cfg.batch_size,
+            batch_size=cfg.template_size,
             num_workers=cfg.num_workers,
             collate_fn=NERDataset.collate_fn,
         )
@@ -109,22 +113,26 @@ def hydra_main(cfg) -> float:
     print("Detected config file, initiating task... {}".format(cfg))
 
     if cfg.train:
+        tags = ["debug"] if cfg.debug else []
         task = Task.init(
             project_name="LongQA",
             task_name="longQA-NER-train",
             output_uri="s3://experiment-logging/storage/",
+            tags=tags
         )
     else:
+        tags = ["debug"] if cfg.debug else []
         task = Task.init(
             project_name="LongQA",
             task_name="longQA-NER-predict",
             output_uri="s3://experiment-logging/storage/",
+            tags=tags
         )
 
     cfg_dict = OmegaConf.to_container(cfg, resolve=True)
     task.connect(cfg_dict)
-    # task.set_base_docker("nvidia/cuda:11.4.0-runtime-ubuntu20.04")
-    # task.execute_remotely(queue_name="compute", exit_process=True)
+    task.set_base_docker("nvidia/cuda:11.4.0-runtime-ubuntu20.04")
+    task.execute_remotely(queue_name="compute2", exit_process=True)
     cfg = get_clearml_params(task)
 
     if cfg.train:

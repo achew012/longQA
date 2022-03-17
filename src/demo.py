@@ -41,6 +41,7 @@ It was not clear what the scope of any such documents might be. Ukraine has said
 task = Task.get_task(task_id="911988b9d0484dcdb25534cc6ae5a964")
 model_path = task.get_models()["output"][0].get_local_copy()
 cfg = get_clearml_params(task)
+
 base_model = NERLongformerQA.load_from_checkpoint(
     model_path, cfg=cfg, task=task
 )

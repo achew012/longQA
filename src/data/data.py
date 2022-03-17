@@ -4,26 +4,6 @@ from typing import List, Any, Dict
 from .preprocessing import process_train_data, process_inference_data
 import ipdb
 
-role_map = {
-    'Location': 'location',
-    'PerpInd': 'perpetrator individuals',
-    'PerpOrg': 'perpetrator organizations',
-    'PhysicalTarget': 'targets',
-    'Weapon': 'weapons',
-    'HumTargetCivilian': 'civilian targets',
-    'HumTargetGovOfficial': 'government official targets',
-    'HumTargetMilitary': 'military targets',
-    'HumTargetPoliticalFigure': 'political figure targets',
-    'HumTargetLegal': 'legal targets',
-    'HumTargetOthers': 'other targets',
-    'KIASingle': 'number of single deaths',
-    'KIAPlural': 'number of plural deaths',
-    'KIAMultiple': 'number of multiple deaths',
-    'WIASingle': 'number of single injured',
-    'WIAPlural': 'number of plural injured',
-    'WIAMultiple': 'number of multiple injured'
-}
-
 
 class NERDataset(Dataset):
     # doc_list
@@ -32,13 +12,12 @@ class NERDataset(Dataset):
         self.tokenizer = tokenizer
         if "templates" in dataset[0].keys():
             self.train = True
-            ipdb.set_trace()
             self.processed_dataset = process_train_data(
-                dataset, self.tokenizer, cfg, role_map)
+                dataset, self.tokenizer, cfg)
         else:
             self.train = False
             self.processed_dataset = process_inference_data(
-                dataset, self.tokenizer, cfg, role_map)
+                dataset, self.tokenizer, cfg)
 
     def __len__(self):
         """Returns length of the dataset"""
@@ -50,6 +29,7 @@ class NERDataset(Dataset):
         item = {}
         item['input_ids'] = self.processed_dataset["input_ids"][idx]
         item['attention_mask'] = self.processed_dataset["attention_mask"][idx]
+        item['context_mask'] = self.processed_dataset["context_mask"][idx]
         item['docid'] = self.processed_dataset["docid"][idx]
         if self.train:
             item['gold_mentions'] = self.processed_dataset["gold_mentions"][idx]
@@ -67,6 +47,7 @@ class NERDataset(Dataset):
         docids = [ex['docid'] for ex in batch]
         input_ids = torch.stack([ex['input_ids'] for ex in batch])
         attention_mask = torch.stack([ex['attention_mask'] for ex in batch])
+        context_mask = torch.stack([ex['context_mask'] for ex in batch])
         gold_mentions = [ex['gold_mentions'] for ex in batch]
         start = torch.stack([ex['start'] for ex in batch])
         end = torch.stack([ex['end'] for ex in batch])
@@ -76,6 +57,7 @@ class NERDataset(Dataset):
             'gold_mentions': gold_mentions,
             'input_ids': input_ids,
             'attention_mask': attention_mask,
+            'context_mask': context_mask,
             'start_positions': start,
             'end_positions': end,
         }
@@ -90,9 +72,11 @@ class NERDataset(Dataset):
         docids = [ex['docid'] for ex in batch]
         input_ids = torch.stack([ex['input_ids'] for ex in batch])
         attention_mask = torch.stack([ex['attention_mask'] for ex in batch])
+        context_mask = torch.stack([ex['context_mask'] for ex in batch])
 
         return {
             'docid': docids,
             'input_ids': input_ids,
             'attention_mask': attention_mask,
+            'context_mask': context_mask,
         }
