@@ -54,6 +54,9 @@ class NERLongformerQA(pl.LightningModule):
         if cfg.grad_ckpt:
             self.base_qa_model.longformer.gradient_checkpointing_enable()
 
+        self.history_embedding = torch.nn.Embedding(
+            self.cfg.max_input_len, self.base_qa_model_config.hidden_size).to(self.device)
+
         # self.frozen_qa_model = AutoModelForQuestionAnswering.from_pretrained(
         #     "mrm8488/longformer-base-4096-finetuned-squadv2")
 
@@ -118,9 +121,38 @@ class NERLongformerQA(pl.LightningModule):
         event_embeddings = event_outputs.hidden_states[-1]
         return event_embeddings
 
-    def sequence_selection_module():
+    def sequence_selection_module(self, input_ids, attention_mask, event_embeddings, context_mask):
+        indices_first_interval = torch.tensor([0, 1, 2]).to(self.device)
+        indices_second_interval = torch.tensor([3, 4, 5]).to(self.device)
+        input_ids_first_interval = torch.index_select(
+            input_ids, 0, indices_first_interval)
+        attention_mask_first_interval = torch.index_select(
+            attention_mask, 0, indices_first_interval)
+
+        input_ids_second_interval = torch.index_select(
+            input_ids, 0, indices_second_interval)
+        attention_mask_second_interval = torch.index_select(
+            attention_mask, 0, indices_second_interval)
+
+        single_layer = self.base_qa_model(
+            input_ids=input_ids_first_interval,
+            attention_mask=attention_mask_first_interval,  # mask padding tokens
+            output_hidden_states=True,
+        )
+        start_logits = single_layer.start_logits
+        end_logits = single_layer.end_logits
+        #logits = torch.nn.functional.softmax(single_layer.hidden_states[-1])
+
+        candidate_start_tokens = torch.topk(start_logits, 5).indices
+        candidate_end_tokens = torch.topk(start_logits, 5).indices
+
+        span_embeds = torch.matmul(self.history_embedding(
+            candidate_start_tokens), torch.transpose(self.history_embedding(candidate_end_tokens), 1, 2))
+
+        ipdb.set_trace()
+
+        # redefine the batches
         # Take different sequence length and order and add the embeddings
-        # if
         return None
 
     def forward(self, **batch):
@@ -129,19 +161,20 @@ class NERLongformerQA(pl.LightningModule):
             batch["attention_mask"],
         )
 
-        # Add a new init history embedding here
-        # Randomly generate different sequences of conversations
-
+        # what is the event that happened?
         event_embeddings = self.get_event_embeddings(
             input_ids, batch["context_mask"])
 
-        qa_embeddings = self.base_qa_model.longformer.embeddings(
-            input_ids)
+        # input_embeds
+        qa_embeddings = self.base_qa_model.longformer.embeddings(input_ids)
 
+        # combine input_embeds with event embeds
         combined_embeddings = torch.add(qa_embeddings, event_embeddings)
-        # Get classifier output as incident type
-        # Generate event question from classifier output
-        # Infer event embeddings from qa model
+
+        # Add a new init history embedding here
+        # Randomly generate different sequences of conversations
+        # combined_embeddings = self.sequence_selection_module(
+        #     input_ids, attention_mask, event_embeddings, batch["context_mask"])
 
         if "start_positions" in batch.keys():
 
@@ -160,7 +193,8 @@ class NERLongformerQA(pl.LightningModule):
 
         else:
             outputs = self.base_qa_model(
-                input_ids=input_ids,
+                # input_ids=input_ids,
+                inputs_embeds=combined_embeddings,
                 attention_mask=attention_mask,  # mask padding tokens
             )
 
