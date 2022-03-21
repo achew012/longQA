@@ -1,5 +1,5 @@
 boto3
-transformers==4.1.0
+transformers==4.16.2
 pytorch-lightning
 datasets
 ipdb

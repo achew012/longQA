@@ -17,6 +17,7 @@ Task.force_requirements_env_freeze(
 Task.add_requirements("git+https://github.com/huggingface/datasets.git")
 Task.add_requirements("hydra-core")
 Task.add_requirements("pytorch-lightning")
+Task.add_requirements("jsonlines")
 
 
 def get_clearml_params(task: Task) -> Dict[str, Any]:
