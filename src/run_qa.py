@@ -117,7 +117,7 @@ def hydra_main(cfg) -> float:
         tags = ["debug"] if cfg.debug else []
         task = Task.init(
             project_name="LongQA",
-            task_name="longQA-NER-train",
+            task_name="ConversationalQA-NER-train",
             output_uri="s3://experiment-logging/storage/",
             tags=tags
         )
@@ -125,7 +125,7 @@ def hydra_main(cfg) -> float:
         tags = ["debug"] if cfg.debug else []
         task = Task.init(
             project_name="LongQA",
-            task_name="longQA-NER-predict",
+            task_name="ConversationalQA-NER-predict",
             output_uri="s3://experiment-logging/storage/",
             tags=tags
         )

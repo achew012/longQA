@@ -430,8 +430,9 @@ class NERLongformerQA(pl.LightningModule):
             eval_keys = [docid for docid in preds.keys()]
             for docid in eval_keys:
                 filtered_golds[docid] = golds[docid]
+            golds = filtered_golds
 
-        results = eval_ceaf(preds, filtered_golds)
+        results = eval_ceaf(preds, golds)
         print("================= CEAF score =================")
         print(
             "phi_strict: P: {:.2f}%,  R: {:.2f}%, F1: {:.2f}%".format(
