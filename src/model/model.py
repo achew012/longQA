@@ -41,8 +41,7 @@ class NERLongformerQA(pl.LightningModule):
         print("CUDA available: ", torch.cuda.is_available())
 
         # Load and update config then load a pretrained LEDForConditionalGeneration
-        self.base_qa_model_config = AutoConfig.from_pretrained(
-            self.cfg.model_name)
+        self.base_qa_model_config = AutoConfig.from_pretrained(self.cfg.model_name)
         # Load tokenizer and metric
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.cfg.model_name, use_fast=True
@@ -55,7 +54,8 @@ class NERLongformerQA(pl.LightningModule):
             self.base_qa_model.longformer.gradient_checkpointing_enable()
 
         self.history_embedding = torch.nn.Embedding(
-            self.cfg.max_input_len, self.base_qa_model_config.hidden_size).to(self.device)
+            self.cfg.max_input_len, self.base_qa_model_config.hidden_size
+        ).to(self.device)
 
         # self.frozen_qa_model = AutoModelForQuestionAnswering.from_pretrained(
         #     "mrm8488/longformer-base-4096-finetuned-squadv2")
@@ -96,43 +96,58 @@ class NERLongformerQA(pl.LightningModule):
         question_separators = (input_ids == 2).nonzero(as_tuple=True)
         sep_indices_batch = [
             torch.masked_select(
-                question_separators[1], torch.eq(
-                    question_separators[0], batch_num)
+                question_separators[1], torch.eq(question_separators[0], batch_num)
             )[0]
             for batch_num in range(batch_size)
         ]
 
         for batch_num in range(batch_size):
-            global_attention_mask[batch_num,
-                                  : sep_indices_batch[batch_num]] = 1
+            global_attention_mask[batch_num, : sep_indices_batch[batch_num]] = 1
 
         return global_attention_mask
 
-    def get_event_embeddings(self, input_ids: torch.tensor, context_mask: torch.tensor) -> torch.tensor:
+    def get_event_embeddings(
+        self, input_ids: torch.tensor, context_mask: torch.tensor
+    ) -> torch.tensor:
         context_mask = context_mask > 0
         context = self.tokenizer.decode(
-            torch.masked_select(input_ids, context_mask), skip_special_tokens=True)
+            torch.masked_select(input_ids, context_mask), skip_special_tokens=True
+        )
         event_encodings = self.tokenizer(
-            "what is the event that happened?", context, padding="max_length", truncation=True,
-            max_length=self.cfg.max_input_len, return_tensors="pt")
+            "what is the event that happened?",
+            context,
+            padding="max_length",
+            truncation=True,
+            max_length=self.cfg.max_input_len,
+            return_tensors="pt",
+        )
         event_encodings = event_encodings.to(self.device)
         event_outputs = self.base_qa_model(
-            input_ids=event_encodings["input_ids"], attention_mask=event_encodings["attention_mask"], output_hidden_states=True)
+            input_ids=event_encodings["input_ids"],
+            attention_mask=event_encodings["attention_mask"],
+            output_hidden_states=True,
+        )
         event_embeddings = event_outputs.hidden_states[-1]
         return event_embeddings
 
-    def sequence_selection_module(self, input_ids, attention_mask, event_embeddings, context_mask):
+    def sequence_selection_module(
+        self, input_ids, attention_mask, event_embeddings, context_mask
+    ):
         indices_first_interval = torch.tensor([0, 1, 2]).to(self.device)
         indices_second_interval = torch.tensor([3, 4, 5]).to(self.device)
         input_ids_first_interval = torch.index_select(
-            input_ids, 0, indices_first_interval)
+            input_ids, 0, indices_first_interval
+        )
         attention_mask_first_interval = torch.index_select(
-            attention_mask, 0, indices_first_interval)
+            attention_mask, 0, indices_first_interval
+        )
 
         input_ids_second_interval = torch.index_select(
-            input_ids, 0, indices_second_interval)
+            input_ids, 0, indices_second_interval
+        )
         attention_mask_second_interval = torch.index_select(
-            attention_mask, 0, indices_second_interval)
+            attention_mask, 0, indices_second_interval
+        )
 
         single_layer = self.base_qa_model(
             input_ids=input_ids_first_interval,
@@ -141,13 +156,15 @@ class NERLongformerQA(pl.LightningModule):
         )
         start_logits = single_layer.start_logits
         end_logits = single_layer.end_logits
-        #logits = torch.nn.functional.softmax(single_layer.hidden_states[-1])
+        # logits = torch.nn.functional.softmax(single_layer.hidden_states[-1])
 
         candidate_start_tokens = torch.topk(start_logits, 5).indices
         candidate_end_tokens = torch.topk(start_logits, 5).indices
 
-        span_embeds = torch.matmul(self.history_embedding(
-            candidate_start_tokens), torch.transpose(self.history_embedding(candidate_end_tokens), 1, 2))
+        span_embeds = torch.matmul(
+            self.history_embedding(candidate_start_tokens),
+            torch.transpose(self.history_embedding(candidate_end_tokens), 1, 2),
+        )
 
         ipdb.set_trace()
 
@@ -162,14 +179,15 @@ class NERLongformerQA(pl.LightningModule):
         )
 
         # what is the event that happened?
-        event_embeddings = self.get_event_embeddings(
-            input_ids, batch["context_mask"])
+        # event_embeddings = self.get_event_embeddings(input_ids, batch["context_mask"])
 
         # input_embeds
         qa_embeddings = self.base_qa_model.longformer.embeddings(input_ids)
 
         # combine input_embeds with event embeds
-        combined_embeddings = torch.add(qa_embeddings, event_embeddings)
+        # combined_embeddings = torch.add(qa_embeddings, event_embeddings)
+
+        combined_embeddings = qa_embeddings
 
         # Add a new init history embedding here
         # Randomly generate different sequences of conversations
@@ -184,8 +202,7 @@ class NERLongformerQA(pl.LightningModule):
                 # input_ids=input_ids,
                 inputs_embeds=combined_embeddings,
                 attention_mask=attention_mask,  # mask padding tokens
-                global_attention_mask=self._set_global_attention_mask(
-                    input_ids),
+                global_attention_mask=self._set_global_attention_mask(input_ids),
                 start_positions=start,
                 end_positions=end,
                 output_hidden_states=True,
@@ -214,21 +231,20 @@ class NERLongformerQA(pl.LightningModule):
             total_loss.append(batch["loss"])
         self.log("train_loss", sum(total_loss) / len(total_loss))
 
-    def extract_answer_spans(self,
-                             start_candidates,
-                             start_candidates_logits,
-                             end_candidates,
-                             end_candidates_logits,
-                             question_indices,
-                             tokens,
-                             attention_mask
-                             ) -> List:
+    def extract_answer_spans(
+        self,
+        start_candidates,
+        start_candidates_logits,
+        end_candidates,
+        end_candidates_logits,
+        question_indices,
+        tokens,
+        attention_mask,
+    ) -> List:
 
         valid_candidates = []
         # For each candidate in sample
-        for start_index, start_score in zip(
-            start_candidates, start_candidates_logits
-        ):
+        for start_index, start_score in zip(start_candidates, start_candidates_logits):
             for end_index, end_score in zip(end_candidates, end_candidates_logits):
 
                 # throw out invalid predictions
@@ -254,7 +270,8 @@ class NERLongformerQA(pl.LightningModule):
                             start_index.item(),
                             end_index.item(),
                             self.tokenizer.decode(
-                                tokens[start_index:end_index], skip_special_tokens=True),
+                                tokens[start_index:end_index], skip_special_tokens=True
+                            ),
                             (start_score + end_score).item(),
                         )
                     )
@@ -277,13 +294,12 @@ class NERLongformerQA(pl.LightningModule):
         question_separators = (batch["input_ids"] == 2).nonzero(as_tuple=True)
         sep_indices_batch = [
             torch.masked_select(
-                question_separators[1], torch.eq(
-                    question_separators[0], batch_num)
+                question_separators[1], torch.eq(question_separators[0], batch_num)
             )[0]
             for batch_num in range(batch_size)
         ]
         question_indices_batch = [
-            [i + 1 for i, token in enumerate(tokens[1: sep_idx + 1])]
+            [i + 1 for i, token in enumerate(tokens[1 : sep_idx + 1])]
             for tokens, sep_idx in zip(batch["input_ids"], sep_indices_batch)
         ]
         batch_outputs = []
@@ -314,14 +330,15 @@ class NERLongformerQA(pl.LightningModule):
             docids,
             gold_mentions,
         ):
-            valid_candidates = self.extract_answer_spans(start_candidates,
-                                                         start_candidates_logits,
-                                                         end_candidates,
-                                                         end_candidates_logits,
-                                                         question_indices,
-                                                         tokens,
-                                                         attention_mask
-                                                         )
+            valid_candidates = self.extract_answer_spans(
+                start_candidates,
+                start_candidates_logits,
+                end_candidates,
+                end_candidates_logits,
+                question_indices,
+                tokens,
+                attention_mask,
+            )
 
             # Attempt to implement a confidence threshold
             score_list = [candidate[3] for candidate in valid_candidates]
@@ -332,17 +349,19 @@ class NERLongformerQA(pl.LightningModule):
             batch_outputs.append(
                 {
                     "docid": docid,
-                    "qns": self.tokenizer.decode(tokens[1: len(question_indices)]),
+                    "qns": self.tokenizer.decode(tokens[1 : len(question_indices)]),
                     "gold_mention": gold_mention,
                     "context": self.tokenizer.decode(
                         torch.masked_select(tokens, torch.gt(attention_mask, 0))[
-                            1 + len(question_indices):
+                            1 + len(question_indices) :
                         ],
-                        skip_special_tokens=True
+                        skip_special_tokens=True,
                     ),
                     "start_gold": start_gold.item(),
                     "end_gold": end_gold.item(),
-                    "gold": self.tokenizer.decode(tokens[start_gold:end_gold], skip_special_tokens=True),
+                    "gold": self.tokenizer.decode(
+                        tokens[start_gold:end_gold], skip_special_tokens=True
+                    ),
                     "candidates": [
                         candidate
                         for candidate in valid_candidates
@@ -420,7 +439,7 @@ class NERLongformerQA(pl.LightningModule):
 
                         filtered_candidates = doc["candidates"][idx]
                         for candidate in filtered_candidates:
-                            if candidate[2] != '':
+                            if candidate[2] != "":
                                 preds[key][role] = [[candidate[2]]]
             else:
                 print("duplicated example")
@@ -490,13 +509,12 @@ class NERLongformerQA(pl.LightningModule):
         question_separators = (batch["input_ids"] == 2).nonzero(as_tuple=True)
         sep_indices_batch = [
             torch.masked_select(
-                question_separators[1], torch.eq(
-                    question_separators[0], batch_num)
+                question_separators[1], torch.eq(question_separators[0], batch_num)
             )[0]
             for batch_num in range(batch_size)
         ]
         question_indices_batch = [
-            [i + 1 for i, token in enumerate(tokens[1: sep_idx + 1])]
+            [i + 1 for i, token in enumerate(tokens[1 : sep_idx + 1])]
             for tokens, sep_idx in zip(batch["input_ids"], sep_indices_batch)
         ]
         batch_outputs = []
@@ -521,14 +539,15 @@ class NERLongformerQA(pl.LightningModule):
             batch["attention_mask"],
             docids,
         ):
-            valid_candidates = self.extract_answer_spans(start_candidates,
-                                                         start_candidates_logits,
-                                                         end_candidates,
-                                                         end_candidates_logits,
-                                                         question_indices,
-                                                         tokens,
-                                                         attention_mask
-                                                         )
+            valid_candidates = self.extract_answer_spans(
+                start_candidates,
+                start_candidates_logits,
+                end_candidates,
+                end_candidates_logits,
+                question_indices,
+                tokens,
+                attention_mask,
+            )
 
             score_list = [candidate[3] for candidate in valid_candidates]
             threshold = max(score_list)
@@ -536,10 +555,10 @@ class NERLongformerQA(pl.LightningModule):
             batch_outputs.append(
                 {
                     "docid": docid,
-                    "qns": self.tokenizer.decode(tokens[1: len(question_indices)]),
+                    "qns": self.tokenizer.decode(tokens[1 : len(question_indices)]),
                     "context": self.tokenizer.decode(
                         torch.masked_select(tokens, torch.gt(attention_mask, 0))[
-                            1 + len(question_indices):
+                            1 + len(question_indices) :
                         ]
                     ),
                     "candidates": [

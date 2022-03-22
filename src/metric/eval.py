@@ -3,32 +3,35 @@ import re
 import string
 import json
 import argparse
+
 # https://docs.scipy.org/doc/scipy-0.18.1/reference/generated/scipy.optimize.linear_sum_assignment.html
 from scipy.optimize import linear_sum_assignment
 from collections import OrderedDict
 from typing import List, Dict, Any, Tuple, Callable
 import ipdb
 
-tag2role = OrderedDict({
-    'location': "Location",
-    'perp_individual_id': "PerpInd",
-    'perp_organization_id': "PerpOrg",
-    'phys_tgt_id': "PhysicalTarget",
-    'incident_instrument_id': "Weapon",
-    'human_target': "HumTarget"
-    # 'hum_tgt_type_civilian': 'HumTargetCivilian',
-    # 'hum_tgt_type_gov_official': 'HumTargetGovOfficial',
-    # 'hum_tgt_type_military': 'HumTargetMilitary',
-    # 'hum_tgt_type_political_figure': 'HumTargetPoliticalFigure',
-    # 'hum_tgt_type_legal': 'HumTargetLegal',
-    # 'hum_tgt_type_others': 'HumTargetOthers',
-    # 'hum_tgt_kia_single': 'KIASingle',
-    # 'hum_tgt_kia_plural': 'KIAPlural',
-    # 'hum_tgt_kia_multiple': 'KIAMultiple',
-    # 'hum_tgt_wia_single': 'WIASingle',
-    # 'hum_tgt_wia_plural': 'WIAPlural',
-    # 'hum_tgt_wia_multiple': 'WIAMultiple'
-})
+tag2role = OrderedDict(
+    {
+        "location": "Location",
+        "perp_individual_id": "PerpInd",
+        "perp_organization_id": "PerpOrg",
+        "phys_tgt_id": "PhysicalTarget",
+        "incident_instrument_id": "Weapon",
+        "human_target": "HumTarget"
+        # 'hum_tgt_type_civilian': 'HumTargetCivilian',
+        # 'hum_tgt_type_gov_official': 'HumTargetGovOfficial',
+        # 'hum_tgt_type_military': 'HumTargetMilitary',
+        # 'hum_tgt_type_political_figure': 'HumTargetPoliticalFigure',
+        # 'hum_tgt_type_legal': 'HumTargetLegal',
+        # 'hum_tgt_type_others': 'HumTargetOthers',
+        # 'hum_tgt_kia_single': 'KIASingle',
+        # 'hum_tgt_kia_plural': 'KIAPlural',
+        # 'hum_tgt_kia_multiple': 'KIAMultiple',
+        # 'hum_tgt_wia_single': 'WIASingle',
+        # 'hum_tgt_wia_plural': 'WIAPlural',
+        # 'hum_tgt_wia_multiple': 'WIAMultiple'
+    }
+)
 
 
 def f1(p_num: float, p_den: int, r_num: float, r_den: int, beta=1):
@@ -66,13 +69,25 @@ def ceaf(clusters, gold_clusters, phi_similarity):
     return similarity, len(clusters), similarity, len(gold_clusters)
 
 
-def eval_ceaf_base(preds: Dict[str, Dict[str, List[List]]], golds: Dict[str, Dict[str, List[List]]], phi_similarity: Callable[[str, str], float], docids: List = []):
+def eval_ceaf_base(
+    preds: Dict[str, Dict[str, List[List]]],
+    golds: Dict[str, Dict[str, List[List]]],
+    phi_similarity: Callable[[str, str], float],
+    docids: List = [],
+):
 
     result = OrderedDict()
     all_keys = list(role for _, role in tag2role.items()) + ["micro_avg"]
     for key in all_keys:
-        result[key] = {"p_num": 0, "p_den": 0, "r_num": 0,
-                       "r_den": 0, "p": 0, "r": 0, "f1": 0}
+        result[key] = {
+            "p_num": 0,
+            "p_den": 0,
+            "r_num": 0,
+            "r_den": 0,
+            "p": 0,
+            "r": 0,
+            "f1": 0,
+        }
 
     if not docids:
         for docid in golds:
@@ -80,15 +95,23 @@ def eval_ceaf_base(preds: Dict[str, Dict[str, List[List]]], golds: Dict[str, Dic
 
     for docid in docids:
         if docid not in preds:
-            pred = OrderedDict([('Location', []), ('PerpInd', []), ('PerpOrg', []), ('PhysicalTarget', []), ('Weapon', []), ('HumTargetCivilian', []), ('HumTargetGovOfficial', []), ('HumTargetMilitary', [
-            ]), ('HumTargetPoliticalFigure', []), ('HumTargetLegal', []), ('HumTargetOthers', []), ('KIASingle', []), ('KIAPlural', []), ('KIAMultiple', []), ('WIASingle', []), ('WIAPlural', []), ('WIAMultiple', [])])
+            pred = OrderedDict(
+                [
+                    ("Location", []),
+                    ("PerpInd", []),
+                    ("PerpOrg", []),
+                    ("PhysicalTarget", []),
+                    ("Weapon", []),
+                    ("HumTarget", []),
+                ]
+            )
         else:
             pred = preds[docid]
 
         gold = golds[docid]
 
         for role in gold:
-            if role != 'incident_type':
+            if role != "incident_type":
                 pred_clusters = []
                 gold_clusters = []
                 for entity in gold[role]:
@@ -103,66 +126,87 @@ def eval_ceaf_base(preds: Dict[str, Dict[str, List[List]]], golds: Dict[str, Dic
                         pred_c.append(mention)
                     pred_clusters.append(pred_c)
 
-                pn, pd, rn, rd = ceaf(
-                    pred_clusters, gold_clusters, phi_similarity)
+                pn, pd, rn, rd = ceaf(pred_clusters, gold_clusters, phi_similarity)
                 result[role]["p_num"] += pn
                 result[role]["p_den"] += pd
                 result[role]["r_num"] += rn
                 result[role]["r_den"] += rd
 
     result["micro_avg"]["p_num"] = sum(
-        result[role]["p_num"] for _, role in tag2role.items())
+        result[role]["p_num"] for _, role in tag2role.items()
+    )
     result["micro_avg"]["p_den"] = sum(
-        result[role]["p_den"] for _, role in tag2role.items())
+        result[role]["p_den"] for _, role in tag2role.items()
+    )
     result["micro_avg"]["r_num"] = sum(
-        result[role]["r_num"] for _, role in tag2role.items())
+        result[role]["r_num"] for _, role in tag2role.items()
+    )
     result["micro_avg"]["r_den"] = sum(
-        result[role]["r_den"] for _, role in tag2role.items())
+        result[role]["r_den"] for _, role in tag2role.items()
+    )
 
     for key in all_keys:
-        result[key]["p"] = 0 if result[key]["p_num"] == 0 else result[key]["p_num"] / \
-            float(result[key]["p_den"])
-        result[key]["r"] = 0 if result[key]["r_num"] == 0 else result[key]["r_num"] / \
-            float(result[key]["r_den"])
-        result[key]["f1"] = f1(result[key]["p_num"], result[key]
-                               ["p_den"], result[key]["r_num"], result[key]["r_den"])
+        result[key]["p"] = (
+            0
+            if result[key]["p_num"] == 0
+            else result[key]["p_num"] / float(result[key]["p_den"])
+        )
+        result[key]["r"] = (
+            0
+            if result[key]["r_num"] == 0
+            else result[key]["r_num"] / float(result[key]["r_den"])
+        )
+        result[key]["f1"] = f1(
+            result[key]["p_num"],
+            result[key]["p_den"],
+            result[key]["r_num"],
+            result[key]["r_den"],
+        )
 
     return result
 
 
 def normalize_string(s: str) -> str:
     """Lower text and remove punctuation, articles and extra whitespace."""
+
     def remove_articles(text):
-        regex = re.compile(r'\b(a|an|the)\b', re.UNICODE)
-        return re.sub(regex, ' ', text)
+        regex = re.compile(r"\b(a|an|the)\b", re.UNICODE)
+        return re.sub(regex, " ", text)
 
     def white_space_fix(text):
-        return ' '.join(text.split())
+        return " ".join(text.split())
 
     def remove_punc(text):
         exclude = set(string.punctuation)
-        return ''.join(ch for ch in text if ch not in exclude)
+        return "".join(ch for ch in text if ch not in exclude)
 
     def lower(text):
         return text.lower()
+
     return white_space_fix(remove_articles(remove_punc(lower(s))))
 
 
-def eval_ceaf(preds: Dict[str, Dict[str, List[List]]], golds: Dict[str, Dict[str, List[List]]], docids: List = []) -> Dict:
+def eval_ceaf(
+    preds: Dict[str, Dict[str, List[List]]],
+    golds: Dict[str, Dict[str, List[List]]],
+    docids: List = [],
+) -> Dict:
     # normalization mention strings
     for docid in preds:
         for role in preds[docid]:
             for idx in range(len(preds[docid][role])):
                 for idy in range(len(preds[docid][role][idx])):
                     preds[docid][role][idx][idy] = normalize_string(
-                        preds[docid][role][idx][idy])
+                        preds[docid][role][idx][idy]
+                    )
 
     for docid in golds:
         for role in golds[docid]:
             for idx in range(len(golds[docid][role])):
                 for idy in range(len(golds[docid][role][idx])):
                     golds[docid][role][idx][idy] = normalize_string(
-                        golds[docid][role][idx][idy])
+                        golds[docid][role][idx][idy]
+                    )
 
     results_strict = eval_ceaf_base(preds, golds, phi_strict, docids)
     results_prop = eval_ceaf_base(preds, golds, phi_prop, docids)
@@ -176,10 +220,16 @@ def eval_ceaf(preds: Dict[str, Dict[str, List[List]]], golds: Dict[str, Dict[str
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--pred_file", default=None, type=str,
-                        required=False, help="preds output file")
-    parser.add_argument("--gold_file", default="./data/muc/processed/test.json",
-                        type=str, required=False, help="gold file")
+    parser.add_argument(
+        "--pred_file", default=None, type=str, required=False, help="preds output file"
+    )
+    parser.add_argument(
+        "--gold_file",
+        default="./data/muc/processed/test.json",
+        type=str,
+        required=False,
+        help="gold file",
+    )
     args = parser.parse_args()
 
     # get pred and gold extracts
@@ -193,8 +243,10 @@ if __name__ == "__main__":
     with open(args.gold_file, encoding="utf-8") as f:
         for line in f:
             line = json.loads(line)
-            docid = str(int(line["docid"].split("-")[0][-1])
-                        * 10000 + int(line["docid"].split("-")[-1]))
+            docid = str(
+                int(line["docid"].split("-")[0][-1]) * 10000
+                + int(line["docid"].split("-")[-1])
+            )
 
             extracts_raw = line["extracts"]
 
@@ -220,10 +272,18 @@ if __name__ == "__main__":
         else:
             print("================= {} =================".format(key))
 
-        str_print += [results["strict"][key]["p"] * 100, results["strict"]
-                      [key]["r"] * 100, results["strict"][key]["f1"] * 100]
-        print("P: {:.2f}%,  R: {:.2f}%, F1: {:.2f}%".format(
-            results["strict"][key]["p"] * 100, results["strict"][key]["r"] * 100, results["strict"][key]["f1"] * 100))  # phi_strict
+        str_print += [
+            results["strict"][key]["p"] * 100,
+            results["strict"][key]["r"] * 100,
+            results["strict"][key]["f1"] * 100,
+        ]
+        print(
+            "P: {:.2f}%,  R: {:.2f}%, F1: {:.2f}%".format(
+                results["strict"][key]["p"] * 100,
+                results["strict"][key]["r"] * 100,
+                results["strict"][key]["f1"] * 100,
+            )
+        )  # phi_strict
         # print("phi_prop: P: {:.2f}%,  R: {:.2f}%, F1: {:.2f}%".format(results["prop"][key]["p"] * 100, results["prop"][key]["r"] * 100, results["prop"][key]["f1"] * 100))
         print()
     str_print = ["{:.2f}".format(r) for r in str_print]

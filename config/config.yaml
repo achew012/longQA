@@ -17,7 +17,7 @@ grad_ckpt: True
 attention_window: 256
 num_epochs: 10
 use_entity_embeddings: False
-model_name: mrm8488/longformer-base-4096-finetuned-squadv2 #allenai/longformer-base-4096 #mrm8488/longformer-base-4096-finetuned-squadv2
+model_name: allenai/longformer-base-4096 #mrm8488/longformer-base-4096-finetuned-squadv2
 trained_model_path: 
 data_dir: /data
 output_dir: /saved_models/
