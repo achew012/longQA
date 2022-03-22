@@ -47,7 +47,7 @@ def get_dataloader(split_name, cfg) -> DataLoader:
     )
     dataset_path = clearml_data_object.get_local_copy()
 
-    dataset_split = read_json_multiple_templates(
+    dataset_split = read_json(
         os.path.join(dataset_path, "data/data/{}.json".format(split_name))
     )
 

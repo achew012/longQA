@@ -7,15 +7,15 @@ def generate_questions_from_template(doc: Dict, role_map: Dict) -> List[List]:
     # qns_ans = [["who are the {} entities?".format(role_map[key].lower()), doc["extracts"][key][0][0][1] if len(doc["extracts"][key]) > 0 else 0, doc["extracts"][key][0][0][1]+len(
     #     doc["extracts"][key][0][0][0]) if len(doc["extracts"][key]) > 0 else 0, doc["extracts"][key][0][0][0] if len(doc["extracts"][key]) > 0 else ""] for key in doc["extracts"].keys()]
 
-    # qns_ans = [["who are the {} entities?".format(role_map[key].lower()), doc["templates"][0][key][0][0][1] if len(doc["templates"][0][key]) > 0 else 0, doc["templates"][0][key][0][0][1]+len(
-    #     doc["templates"][0][key][0][0][0]) if len(doc["templates"][0][key]) > 0 else 0, doc["templates"][0][key][0][0][0] if len(doc["templates"][0][key]) > 0 else ""] for key in doc["templates"][0].keys()]
+    # qns_ans = [["who are the {} entities?".format(role_map[key].lower()), doc["extracts"][0][key][0][0][1] if len(doc["extracts"][0][key]) > 0 else 0, doc["extracts"][0][key][0][0][1]+len(
+    #     doc["extracts"][0][key][0][0][0]) if len(doc["extracts"][0][key]) > 0 else 0, doc["extracts"][0][key][0][0][0] if len(doc["extracts"][0][key]) > 0 else ""] for key in doc["extracts"][0].keys()]
 
-    qns_ans = [["who are the {} entities?".format(role_map[key].lower()), doc["templates"][key][0][0][1] if len(doc["templates"][key]) > 0 else 0, doc["templates"][key][0][0][1]+len(
-        doc["templates"][key][0][0][0]) if len(doc["templates"][key]) > 0 else 0, doc["templates"][key][0][0][0] if len(doc["templates"][key]) > 0 else ""] for key in doc["templates"].keys()]
+    qns_ans = [["who are the {} entities?".format(role_map[key].lower()), doc["extracts"][key][0][0][1] if len(doc["extracts"][key]) > 0 else 0, doc["extracts"][key][0][0][1]+len(
+        doc["extracts"][key][0][0][0]) if len(doc["extracts"][key]) > 0 else 0, doc["extracts"][key][0][0][0] if len(doc["extracts"][key]) > 0 else ""] for key in doc["extracts"].keys()]
 
-    # templates = doc["templates"]
+    # extracts = doc["extracts"]
     # qns_ans = []
-    # for template in templates:
+    # for template in extracts:
     #     for key in template.keys():
     #         if key != "incident_type":
     #             role = key

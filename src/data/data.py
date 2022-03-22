@@ -5,23 +5,7 @@ from .preprocessing import process_train_data, process_inference_data
 import ipdb
 
 role_map = {
-    'Location': 'location',
-    'PerpInd': 'perpetrator individuals',
-    'PerpOrg': 'perpetrator organizations',
-    'PhysicalTarget': 'targets',
-    'Weapon': 'weapons',
-    'HumTargetCivilian': 'civilian targets',
-    'HumTargetGovOfficial': 'government official targets',
-    'HumTargetMilitary': 'military targets',
-    'HumTargetPoliticalFigure': 'political figure targets',
-    'HumTargetLegal': 'legal targets',
-    'HumTargetOthers': 'other targets',
-    'KIASingle': 'number of single deaths',
-    'KIAPlural': 'number of plural deaths',
-    'KIAMultiple': 'number of multiple deaths',
-    'WIASingle': 'number of single injured',
-    'WIAPlural': 'number of plural injured',
-    'WIAMultiple': 'number of multiple injured'
+    'Weapon': 'weapons'
 }
 
 
@@ -30,7 +14,7 @@ class NERDataset(Dataset):
     # extracted_list as template
     def __init__(self, dataset: List[Dict], tokenizer: Any, cfg: Any):
         self.tokenizer = tokenizer
-        if "templates" in dataset[0].keys():
+        if "extracts" in dataset[0].keys():
             self.train = True
             self.processed_dataset = process_train_data(
                 dataset, self.tokenizer, cfg, role_map)
