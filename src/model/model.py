@@ -178,16 +178,17 @@ class NERLongformerQA(pl.LightningModule):
             batch["attention_mask"],
         )
 
-        # what is the event that happened?
-        # event_embeddings = self.get_event_embeddings(input_ids, batch["context_mask"])
-
         # input_embeds
         qa_embeddings = self.base_qa_model.longformer.embeddings(input_ids)
-
-        # combine input_embeds with event embeds
-        # combined_embeddings = torch.add(qa_embeddings, event_embeddings)
-
-        combined_embeddings = qa_embeddings
+        if self.cfg.add_prompt_qns:
+            # what is the event that happened?
+            event_embeddings = self.get_event_embeddings(
+                input_ids, batch["context_mask"]
+            )
+            # combine input_embeds with event embeds
+            combined_embeddings = torch.add(qa_embeddings, event_embeddings)
+        else:
+            combined_embeddings = qa_embeddings
 
         # Add a new init history embedding here
         # Randomly generate different sequences of conversations
