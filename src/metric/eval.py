@@ -6,8 +6,17 @@ import argparse
 from scipy.optimize import linear_sum_assignment # https://docs.scipy.org/doc/scipy-0.18.1/reference/generated/scipy.optimize.linear_sum_assignment.html
 from collections import OrderedDict
 
-tag2role = OrderedDict({
-'incident_instrument_id': "Weapon"})
+tag2role = OrderedDict(
+    {
+        "location": "Location",
+        "perp_individual_id": "PerpInd",
+        "perp_organization_id": "PerpOrg",
+        "phys_tgt_id": "PhysicalTarget",
+        "incident_instrument_id": "Weapon",
+        "human_target": "HumTarget"
+    }
+)
+
 
 def f1(p_num, p_den, r_num, r_den, beta=1):
     p = 0 if p_den == 0 else p_num / float(p_den)
@@ -53,7 +62,20 @@ def eval_ceaf_base(preds, golds, phi_similarity, docids=[]):
             docids.append(docid)
 
     for docid in docids:
-        pred = preds[docid]
+        if docid not in preds:
+            pred = OrderedDict(
+                [
+                    ("Location", []),
+                    ("PerpInd", []),
+                    ("PerpOrg", []),
+                    ("PhysicalTarget", []),
+                    ("Weapon", []),
+                    ("HumTarget", []),
+                ]
+            )
+        else:
+            pred = preds[docid]
+
         gold = golds[docid]
 
         for role in gold:
