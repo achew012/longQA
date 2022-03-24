@@ -61,26 +61,53 @@ def compute_f1(a_gold, a_pred):
     return f1
 
 
-def read_golds_from_test_file(data_dir, tokenizer):
+def read_golds_from_test_file(data_dir, tokenizer, cfg):
     golds = OrderedDict()
-    doctexts_tokens = OrderedDict()
     file_path = os.path.join(data_dir, "test.json")
-    with open(file_path, encoding="utf-8") as f:
-        for line in f:
-            line = json.loads(line)
-            docid = line["docid"]
-            # docid = int(line["docid"].split("-")[0][-1])*10000 + int(line["docid"].split("-")[-1]) # transform TST1-MUC3-0001 to int(0001)
-            doctext, extracts_raw = line["doctext"], line["extracts"]
-            
-            extracts = OrderedDict()
-            for role, entitys_raw in extracts_raw.items():
-                extracts[role] = []
-                for entity_raw in entitys_raw:
-                    entity = []
-                    for mention_offset_pair in entity_raw:
-                        entity.append(mention_offset_pair[0])
-                    if entity:
-                        extracts[role].append(entity)
-            doctexts_tokens[docid] = tokenizer.tokenize(doctext)
-            golds[docid] = extracts
-    return doctexts_tokens, golds
+    raw_gold_file = read_json(file_path)
+    # raw_gold_incidents = {incident['docid']: incident
+    #                       for incident in raw_gold_file}
+    raw_gold_tokens = {incident['docid']: tokenizer.tokenize(incident["doctext"])
+                       for incident in raw_gold_file}
+    raw_gold_templates = {incident['docid']: incident["templates"]
+                          for incident in raw_gold_file}
+
+    default_template = OrderedDict()
+    for key in cfg.role_map.keys():
+        default_template[key] = [[]]
+
+    for docid, raw_templates in raw_gold_templates.items():
+        templates = []
+
+        if len(raw_templates) > 0:
+            for template_raw in raw_templates:
+                template = OrderedDict()
+                if len(template_raw.keys()) > 0:
+                    incident_type = template_raw.pop("incident_type")
+                    for role in cfg.role_map.keys():
+                        value = template_raw[role]
+                        template[role] = []
+                        for entity_raw in value:
+                            # first_mention_tokens = tokenizer.tokenize(entity[0][0])
+                            # start, end = find_sub_list(first_mention_tokens, doctext_tokens)
+                            # if start != -1 and end != -1:
+                            #     template[role].append([start, end])
+                            entity = []
+                            for mention_offset_pair in entity_raw:
+                                entity.append(mention_offset_pair[0])
+                            if len(entity) > 0:
+                                template[role].append(entity)
+                            else:
+                                template[role].append([[]])
+                else:
+                    template = default_template
+
+                if template not in templates:
+                    templates.append(template)
+
+        else:
+            templates.append(default_template)
+
+        golds[docid] = templates[0]
+
+    return raw_gold_tokens, golds

@@ -139,46 +139,6 @@ class NERLongformerQA(pl.LightningModule):
             total_loss.append(batch["loss"])
         self.log("train_loss", sum(total_loss) / len(total_loss))
 
-    # def _get_dataloader(self, split_name):
-    #     """Get training and validation dataloaders"""
-    #     dataset_split = read_json_multiple_templates(
-    #         os.path.join(self.dataset_path, "data/data/{}.json".format(split_name))
-    #     )
-
-    #     if self.cfg.debug:
-    #         dataset_split = dataset_split[:50]
-
-    #     dataset = NERDataset(
-    #         dataset=dataset_split, tokenizer=self.tokenizer, cfg=self.cfg
-    #     )
-
-    #     if split_name in ["dev", "test"]:
-    #         return DataLoader(
-    #             dataset,
-    #             batch_size=self.cfg.eval_batch_size,
-    #             num_workers=self.cfg.num_workers,
-    #             collate_fn=NERDataset.collate_fn,
-    #         )
-    #     else:
-    #         return DataLoader(
-    #             dataset,
-    #             batch_size=self.cfg.batch_size,
-    #             num_workers=self.cfg.num_workers,
-    #             collate_fn=NERDataset.collate_fn,
-    #         )
-
-    # def train_dataloader(self):
-    #     print("Loading train dataset")
-    #     return self._get_dataloader('train')
-
-    # def val_dataloader(self):
-    #     print("Loading dev dataset")
-    #     return self._get_dataloader('dev')
-
-    # def test_dataloader(self):
-    #     print("Loading test dataset")
-    #     return self._get_dataloader('test')
-
     def extract_answer_spans(self,
                              start_candidates,
                              start_candidates_logits,
@@ -345,7 +305,7 @@ class NERLongformerQA(pl.LightningModule):
 
         logs = {}
         doctexts_tokens, golds = read_golds_from_test_file(
-            os.path.join(self.dataset_path, "data/data"), self.tokenizer
+            self.dataset_path, self.tokenizer, self.cfg
         )
 
         if self.cfg.debug:
@@ -385,18 +345,11 @@ class NERLongformerQA(pl.LightningModule):
         for (key, doc), ent_spans in zip(predictions.items(), span_preds):
             if key not in preds:
                 preds[key] = OrderedDict()
-                for idx, role in enumerate(self.cfg.role_list):
+                for idx, role in enumerate(self.cfg.role_map.keys()):
                     preds[key][role] = []
                     if idx + 1 > len(doc["candidates"]):
                         continue
                     elif doc["candidates"][idx]:
-
-                        # if doc["candidates"][idx][0][2]!="</s>":
-                        #     filtered_candidates = set(ent_spans).intersection(set(candidate[2].replace("</s>", "").strip() for candidate in doc["candidates"][idx]))
-                        #     filtered_candidates = filtered_candidates.union(set(candidate[2].replace("</s>", "").strip() for candidate in doc["candidates"][idx]))
-                        # else:
-                        #     filtered_candidates = []
-                        # preds[key][role] = [[candidate] for candidate in filtered_candidates]
 
                         filtered_candidates = doc["candidates"][idx]
                         for candidate in filtered_candidates:
@@ -535,13 +488,6 @@ class NERLongformerQA(pl.LightningModule):
         if self.cfg.use_entity_embeddings:
             for (_, parameters) in self.span_embeds.named_parameters():
                 parameters.requires_grad = False
-
-        # Freeze the model
-        # for idx, (name, parameters) in enumerate(self.base_model.named_parameters()):
-        #     if idx<6:
-        #         parameters.requires_grad=False
-        #     else:
-        #         parameters.requires_grad=True
 
         optimizer = torch.optim.AdamW(self.parameters(), lr=self.cfg.lr)
         return [optimizer]
