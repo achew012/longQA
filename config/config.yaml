@@ -19,25 +19,17 @@ fp16: False
 grad_ckpt: True
 attention_window: 256
 num_epochs: 10
-every_n_epochs: 2
 use_entity_embeddings: False
 model_name: allenai/longformer-base-4096 #mrm8488/longformer-base-4096-finetuned-squadv2
 trained_model_path: 
 data_dir: /data
 output_dir: /saved_models/
 clearml_dataset_project_name: datasets/muc4
-clearml_dataset_name: muc4-processed-post-eda-v3
-clearml_dataset_tags: ['6 Fields', 'GTT', 'processed']
+clearml_dataset_name: muc4-processed-post-eda-weapon
+clearml_dataset_tags: []
 gpu: 1
 debug: False
 train: True
 test: True
-role_map: {
-    'Location': "where did the event happen?",
-    'PerpInd': "who attacked the victim?",
-    'PerpOrg': "what organization did the attacker belong to?",
-    'PhysicalTarget': "what is the target of the event?",
-    'HumTarget': "who is the victim of the event?",
-    'Weapon': 'what weapon was used to attack the victim?',
-}
+role_list: ["Weapon"]
 classifier_outputs: []

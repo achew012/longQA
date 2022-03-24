@@ -5,10 +5,6 @@ from .preprocessing import process_train_data, process_inference_data
 import ipdb
 
 role_map = {
-    'PerpInd': 'perpetrator individuals',
-    'PerpOrg': 'perpetrator organizations',
-    'Victim': 'victims',
-    'Target': 'targets',
     'Weapon': 'weapons'
 }
 
@@ -18,14 +14,14 @@ class NERDataset(Dataset):
     # extracted_list as template
     def __init__(self, dataset: List[Dict], tokenizer: Any, cfg: Any):
         self.tokenizer = tokenizer
-        if "templates" in dataset[0].keys():
+        if "extracts" in dataset[0].keys():
             self.train = True
             self.processed_dataset = process_train_data(
-                dataset, self.tokenizer, cfg)
+                dataset, self.tokenizer, cfg, role_map)
         else:
             self.train = False
             self.processed_dataset = process_inference_data(
-                dataset, self.tokenizer, cfg)
+                dataset, self.tokenizer, cfg, role_map)
 
     def __len__(self):
         """Returns length of the dataset"""
@@ -34,9 +30,10 @@ class NERDataset(Dataset):
     def __getitem__(self, idx):
         """Gets an example from the dataset. The input and output are tokenized and limited to a certain seqlen."""
         # item = {key: val[idx] for key, val in self.processed_dataset["encodings"].items()}
-        item = {'input_ids': self.processed_dataset["input_ids"][idx],
-                'attention_mask': self.processed_dataset["attention_mask"][idx],
-                'docid': self.processed_dataset["docid"][idx]}
+        item = {}
+        item['input_ids'] = self.processed_dataset["input_ids"][idx]
+        item['attention_mask'] = self.processed_dataset["attention_mask"][idx]
+        item['docid'] = self.processed_dataset["docid"][idx]
         if self.train:
             item['gold_mentions'] = self.processed_dataset["gold_mentions"][idx]
             item['start'] = torch.tensor(self.processed_dataset["start"])[idx]
