@@ -1,5 +1,5 @@
 seed: 1234
-lr: 1e-04
+lr: 1e-05
 clip-norm: 0.1
 dropout: 0.2
 max-tokens: 4000
@@ -14,11 +14,11 @@ max_output_len: 128
 max_input_len: 1024
 batch_size: 8
 eval_batch_size: 8
-grad_accum: 1
+grad_accum: 4
 fp16: False
 grad_ckpt: True
 attention_window: 256
-num_epochs: 10
+num_epochs: 12
 every_n_epochs: 2
 use_entity_embeddings: False
 model_name: allenai/longformer-base-4096 #mrm8488/longformer-base-4096-finetuned-squadv2

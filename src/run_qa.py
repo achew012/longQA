@@ -61,6 +61,7 @@ def get_dataloader(split_name, cfg) -> DataLoader:
             batch_size=cfg.eval_batch_size,
             num_workers=cfg.num_workers,
             collate_fn=NERDataset.collate_fn,
+            shuffle=True
         )
     else:
         return DataLoader(
@@ -68,6 +69,7 @@ def get_dataloader(split_name, cfg) -> DataLoader:
             batch_size=cfg.batch_size,
             num_workers=cfg.num_workers,
             collate_fn=NERDataset.collate_fn,
+            shuffle=True
         )
 
 
