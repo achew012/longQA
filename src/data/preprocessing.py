@@ -28,7 +28,7 @@ def generate_questions_from_template(doc: Dict, role_map: Dict) -> List[Dict]:
     for template in doc["templates"]:
         incident = template.pop('incident_type', None)
         qns_ans = []
-        for key in template.keys():
+        for key in role_map.keys():
             natural_question = get_question(role_map[key].lower())
             if natural_question:
                 if len(template[key]) > 0:

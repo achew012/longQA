@@ -4,13 +4,6 @@ from typing import List, Any, Dict
 from .preprocessing import process_train_data, process_inference_data
 import ipdb
 
-role_map = {
-    'PerpInd': 'perpetrator individuals',
-    'PerpOrg': 'perpetrator organizations',
-    'Victim': 'victims',
-    'Target': 'targets',
-    'Weapon': 'weapons'
-}
 
 
 class NERDataset(Dataset):
