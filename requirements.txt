@@ -1,3 +1,4 @@
+torch
 boto3
 transformers==4.16.2
 pytorch-lightning

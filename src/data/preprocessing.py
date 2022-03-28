@@ -2,6 +2,11 @@ from typing import List, Dict, Any, Tuple
 import ipdb
 import random
 
+# from transformers import T5ForConditionalGeneration, T5Tokenizer
+
+# qg_model = T5ForConditionalGeneration.from_pretrained("ramsrigouthamg/t5_paraphraser")
+# qg_tokenizer = T5Tokenizer.from_pretrained("ramsrigouthamg/t5_paraphraser")
+
 
 def get_question(role):
     if "deaths" in role:
@@ -22,17 +27,23 @@ def is_existing_question(natural_question: str, qns_ans: List) -> Tuple[bool, An
     return (False, -1)
 
 
-def random_swap(input_qns: str, tokenizer: Any, chance: float = 0.05):
-    input_ids = tokenizer.encode(input_qns)
+def random_swap(input_qns: str, tokenizer: Any, chance: float = 0.0):
     if random.random() < chance:
-        random_position = random.randint(0, len(input_ids)-1)
-        random_ids = random.randint(0, len(tokenizer.vocab)-1)
+        input_ids = tokenizer.encode(input_qns)
+        random_position = random.randint(0, len(input_ids) - 1)
+        random_ids = random.randint(0, len(tokenizer.vocab) - 1)
         input_ids[random_position] = random_ids
+        return tokenizer.decode(input_ids, skip_special_tokens=True)
+    else:
+        return input_qns
 
-    return tokenizer.decode(input_ids, skip_special_tokens=True)
 
+def generate_questions_from_template(
+    doc: Dict, role_map: Dict, tokenizer: object
+) -> List[Dict]:
 
-def generate_questions_from_template(doc: Dict, role_map: Dict, tokenizer: object) -> List[Dict]:
+    context = doc["doctext"]
+    # event_context = get_event_context()
 
     events = []
     for template in doc["templates"]:
@@ -59,14 +70,11 @@ def generate_questions_from_template(doc: Dict, role_map: Dict, tokenizer: objec
                     if (start_idx, end_idx, mention) not in qns_ans[existing_idx][1]:
                         qns_ans[existing_idx] = [
                             qns_ans[existing_idx][0],
-                            qns_ans[existing_idx][1] +
-                            [(start_idx, end_idx, mention)],
+                            qns_ans[existing_idx][1] + [(start_idx, end_idx, mention)],
                         ]
                 else:
-                    qns_ans.append(
-                        [natural_question, [(start_idx, end_idx, mention)]])
-        events.append(
-            {"incident": incident, "question_answer_pair_list": qns_ans})
+                    qns_ans.append([natural_question, [(start_idx, end_idx, mention)]])
+        events.append({"incident": incident, "question_answer_pair_list": qns_ans})
 
     return events
 
@@ -139,7 +147,7 @@ def convert_character_spans_to_word_spans(
 
             # Detect if the answer is out of the span (in which case this feature is labeled with the CLS index).
             qns_offset = sequence_ids.index(1) - 1
-            pad_start_idx = sequence_ids[sequence_ids.index(1):].index(None)
+            pad_start_idx = sequence_ids[sequence_ids.index(1) :].index(None)
             offsets_wo_pad = context_encodings["offset_mapping"][0][
                 qns_offset:pad_start_idx
             ]
@@ -247,8 +255,7 @@ def process_inference_data(dataset: List[Dict], tokenizer: Any, cfg: Any) -> Dic
         processed_dataset["docid"].append(docid)
         processed_dataset["context"].append(context)
         processed_dataset["qns"].append(docid)
-        processed_dataset["input_ids"].append(
-            context_encodings["input_ids"].squeeze(0))
+        processed_dataset["input_ids"].append(context_encodings["input_ids"].squeeze(0))
         processed_dataset["attention_mask"].append(
             context_encodings["attention_mask"].squeeze(0)
         )

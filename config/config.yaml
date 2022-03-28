@@ -1,19 +1,19 @@
-dseed: 1234
-lr: 1e-03
+seed: 1234
+lr: 1e-05
 dropout: 0.2
 warmup: 1000
 num_workers: 4
 every_n_epochs: 5
 max_prediction_span: 25
 max_output_len: 128
-max_input_len: 512
+max_input_len: 1024
 batch_size: 16
 eval_batch_size: 8
 template_size: 6
-grad_accum: 1
+grad_accum: 4
 fp16: False
 grad_ckpt: True
-attention_window: 512
+attention_window: 256
 num_epochs: 15
 model_name: allenai/longformer-base-4096 #mrm8488/longformer-base-4096-finetuned-squadv2
 data_dir: /data
