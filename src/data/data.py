@@ -70,6 +70,7 @@ class NERDataset(Dataset):
         """
 
         docids = [ex['docid'] for ex in batch]
+        gold_mentions = [ex['gold_mentions'] for ex in batch]
         input_ids = torch.stack([ex['input_ids'] for ex in batch])
         attention_mask = torch.stack([ex['attention_mask'] for ex in batch])
         context_mask = torch.stack([ex['context_mask'] for ex in batch])
@@ -79,4 +80,5 @@ class NERDataset(Dataset):
             'input_ids': input_ids,
             'attention_mask': attention_mask,
             'context_mask': context_mask,
+            'gold_mentions': gold_mentions,
         }

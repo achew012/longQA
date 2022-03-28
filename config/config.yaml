@@ -1,22 +1,20 @@
-seed: 1234
-lr: 1e-04
-clip-norm: 0.1
+dseed: 1234
+lr: 1e-03
 dropout: 0.2
-max-tokens: 4000
 warmup: 1000
 num_workers: 4
-every_n_epochs: 2
+every_n_epochs: 5
 max_prediction_span: 25
 max_output_len: 128
-max_input_len: 1024
-batch_size: 8
+max_input_len: 512
+batch_size: 16
 eval_batch_size: 8
 template_size: 6
 grad_accum: 1
 fp16: False
 grad_ckpt: True
-attention_window: 256
-num_epochs: 6
+attention_window: 512
+num_epochs: 15
 model_name: allenai/longformer-base-4096 #mrm8488/longformer-base-4096-finetuned-squadv2
 data_dir: /data
 output_dir: /saved_models/
@@ -28,13 +26,17 @@ gpu: 1
 debug: False
 train: True
 test: True
+remote: True
+early_stopping: True
+checkpointing: True
 trained_model_path: 
-add_prompt_qns: True
+queue: compute2
+add_prompt_qns: False
 role_map: {
     'Location': "where did the event happen?",
     'PerpInd': "who attacked the victim?",
     'PerpOrg': "what organization did the attacker belong to?",
     'PhysicalTarget': "what is the target of the event?",
     'HumTarget': "who is the victim of the event?",
-    'Weapon': 'what weapon was used to attack the victim?',
+    'Weapon': 'what was used to attack the victim?',
 }

@@ -19,6 +19,11 @@ def read_json(jsonfile):
     return file_object
 
 
+def write_json(filename, file_object):
+    with open(filename, 'w') as file:
+        file.write(json.dumps(file_object))
+
+
 def read_json_multiple_templates(jsonfile):
     with open(jsonfile, 'rb') as file:
         file_object = [json.loads(sample) for sample in file]
@@ -161,9 +166,9 @@ def compute_f1(a_gold, a_pred):
 #     return doctexts_tokens, golds
 
 
-def read_golds_from_test_file(data_dir, tokenizer, cfg):
+def read_golds_from_test_file(data_dir, tokenizer, cfg, filename="test.json"):
     golds = OrderedDict()
-    file_path = os.path.join(data_dir, "test.json")
+    file_path = os.path.join(data_dir, filename)
     raw_gold_file = read_json(file_path)
     # raw_gold_incidents = {incident['docid']: incident
     #                       for incident in raw_gold_file}

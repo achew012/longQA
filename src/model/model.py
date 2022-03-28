@@ -1,5 +1,4 @@
 import os
-from torch.utils.data import DataLoader
 from torch import nn
 import torch
 from typing import List, Any, Dict
@@ -11,12 +10,12 @@ from transformers import (
     AutoTokenizer,
     AutoModelForQuestionAnswering,
     AutoConfig,
-    AutoModelForSeq2SeqLM,
     set_seed,
     get_linear_schedule_with_warmup,
 )
+import torch
 import pytorch_lightning as pl
-from clearml import StorageManager, Dataset as ClearML_Dataset
+from clearml import Dataset as ClearML_Dataset
 import ipdb
 
 
@@ -41,7 +40,9 @@ class NERLongformerQA(pl.LightningModule):
         print("CUDA available: ", torch.cuda.is_available())
 
         # Load and update config then load a pretrained LEDForConditionalGeneration
-        self.base_qa_model_config = AutoConfig.from_pretrained(self.cfg.model_name)
+        self.base_qa_model_config = AutoConfig.from_pretrained(
+            self.cfg.model_name)
+        self.base_qa_model_config.attention_window = self.cfg.attention_window
         # Load tokenizer and metric
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.cfg.model_name, use_fast=True
@@ -53,18 +54,9 @@ class NERLongformerQA(pl.LightningModule):
         if cfg.grad_ckpt:
             self.base_qa_model.longformer.gradient_checkpointing_enable()
 
-        self.history_embedding = torch.nn.Embedding(
-            self.cfg.max_input_len, self.base_qa_model_config.hidden_size
-        ).to(self.device)
-
-        # self.frozen_qa_model = AutoModelForQuestionAnswering.from_pretrained(
-        #     "mrm8488/longformer-base-4096-finetuned-squadv2")
-
-        # self.qg_tokenizer = AutoTokenizer.from_pretrained(
-        #     "iarfmoose/t5-base-question-generator")
-
-        # self.qg_model = AutoModelForSeq2SeqLM.from_pretrained(
-        #     "iarfmoose/t5-base-question-generator")
+        # self.history_embedding = torch.nn.Embedding(
+        #     self.cfg.max_input_len, self.base_qa_model_config.hidden_size
+        # ).to(self.device)
 
     def _set_global_attention_mask(self, input_ids):
         """Configure the global attention pattern based on the self.task"""
@@ -96,13 +88,15 @@ class NERLongformerQA(pl.LightningModule):
         question_separators = (input_ids == 2).nonzero(as_tuple=True)
         sep_indices_batch = [
             torch.masked_select(
-                question_separators[1], torch.eq(question_separators[0], batch_num)
+                question_separators[1], torch.eq(
+                    question_separators[0], batch_num)
             )[0]
             for batch_num in range(batch_size)
         ]
 
         for batch_num in range(batch_size):
-            global_attention_mask[batch_num, : sep_indices_batch[batch_num]] = 1
+            global_attention_mask[batch_num,
+                                  : sep_indices_batch[batch_num]] = 1
 
         return global_attention_mask
 
@@ -114,7 +108,7 @@ class NERLongformerQA(pl.LightningModule):
             torch.masked_select(input_ids, context_mask), skip_special_tokens=True
         )
         event_encodings = self.tokenizer(
-            "what is the event that happened?",
+            "what happened?",
             context,
             padding="max_length",
             truncation=True,
@@ -156,18 +150,15 @@ class NERLongformerQA(pl.LightningModule):
         )
         start_logits = single_layer.start_logits
         end_logits = single_layer.end_logits
-        # logits = torch.nn.functional.softmax(single_layer.hidden_states[-1])
 
         candidate_start_tokens = torch.topk(start_logits, 5).indices
         candidate_end_tokens = torch.topk(start_logits, 5).indices
 
         span_embeds = torch.matmul(
             self.history_embedding(candidate_start_tokens),
-            torch.transpose(self.history_embedding(candidate_end_tokens), 1, 2),
+            torch.transpose(self.history_embedding(
+                candidate_end_tokens), 1, 2),
         )
-
-        ipdb.set_trace()
-
         # redefine the batches
         # Take different sequence length and order and add the embeddings
         return None
@@ -179,40 +170,51 @@ class NERLongformerQA(pl.LightningModule):
         )
 
         # input_embeds
-        qa_embeddings = self.base_qa_model.longformer.embeddings(input_ids)
-        if self.cfg.add_prompt_qns:
-            # what is the event that happened?
-            event_embeddings = self.get_event_embeddings(
-                input_ids, batch["context_mask"]
-            )
-            # combine input_embeds with event embeds
-            combined_embeddings = torch.add(qa_embeddings, event_embeddings)
-        else:
-            combined_embeddings = qa_embeddings
+        # qa_embeddings = self.base_qa_model.longformer.embeddings(input_ids)
+        # if self.cfg.add_prompt_qns:
+        #     # what is the event that happened?
+        #     event_embeddings = self.get_event_embeddings(
+        #         input_ids, batch["context_mask"]
+        #     )
+        #     # combine input_embeds with event embeds
+        #     combined_embeddings = torch.add(qa_embeddings, event_embeddings)
+        # else:
+        #     combined_embeddings = qa_embeddings
 
         # Add a new init history embedding here
         # Randomly generate different sequences of conversations
         # combined_embeddings = self.sequence_selection_module(
         #     input_ids, attention_mask, event_embeddings, batch["context_mask"])
 
-        if "start_positions" in batch.keys():
+        if "start_positions" in batch.keys() and "end_positions" in batch.keys():
 
-            start, end = batch["start_positions"], batch["end_positions"]
+            start_positions, end_positions = batch["start_positions"], batch["end_positions"]
 
             outputs = self.base_qa_model(
-                # input_ids=input_ids,
-                inputs_embeds=combined_embeddings,
+                input_ids=input_ids,
+                # inputs_embeds=combined_embeddings,
                 attention_mask=attention_mask,  # mask padding tokens
-                global_attention_mask=self._set_global_attention_mask(input_ids),
-                start_positions=start,
-                end_positions=end,
+                global_attention_mask=self._set_global_attention_mask(
+                    input_ids),
+                start_positions=start_positions,
+                end_positions=end_positions,
                 output_hidden_states=True,
             )
 
+            # start_logits = outputs.start_logits
+            # end_logits = outputs.end_logits
+            # ignored_index = start_logits.size(1)
+            # start_positions = start_positions.clamp(0, ignored_index)
+            # end_positions = end_positions.clamp(0, ignored_index)
+            # loss_fct = torch.nn.CrossEntropyLoss(ignore_index=ignored_index)
+            # start_loss = loss_fct(start_logits, start_positions)
+            # end_loss = loss_fct(end_logits, end_positions)
+            # total_loss = (start_loss + end_loss) / 2
+
         else:
             outputs = self.base_qa_model(
-                # input_ids=input_ids,
-                inputs_embeds=combined_embeddings,
+                input_ids=input_ids,
+                # inputs_embeds=combined_embeddings,
                 attention_mask=attention_mask,  # mask padding tokens
             )
 
@@ -295,12 +297,13 @@ class NERLongformerQA(pl.LightningModule):
         question_separators = (batch["input_ids"] == 2).nonzero(as_tuple=True)
         sep_indices_batch = [
             torch.masked_select(
-                question_separators[1], torch.eq(question_separators[0], batch_num)
+                question_separators[1], torch.eq(
+                    question_separators[0], batch_num)
             )[0]
             for batch_num in range(batch_size)
         ]
         question_indices_batch = [
-            [i + 1 for i, token in enumerate(tokens[1 : sep_idx + 1])]
+            [i + 1 for i, token in enumerate(tokens[1: sep_idx + 1])]
             for tokens, sep_idx in zip(batch["input_ids"], sep_indices_batch)
         ]
         batch_outputs = []
@@ -350,11 +353,11 @@ class NERLongformerQA(pl.LightningModule):
             batch_outputs.append(
                 {
                     "docid": docid,
-                    "qns": self.tokenizer.decode(tokens[1 : len(question_indices)]),
+                    "qns": self.tokenizer.decode(tokens[1: len(question_indices)]),
                     "gold_mention": gold_mention,
                     "context": self.tokenizer.decode(
                         torch.masked_select(tokens, torch.gt(attention_mask, 0))[
-                            1 + len(question_indices) :
+                            1 + len(question_indices):
                         ],
                         skip_special_tokens=True,
                     ),
@@ -366,7 +369,7 @@ class NERLongformerQA(pl.LightningModule):
                     "candidates": [
                         candidate
                         for candidate in valid_candidates
-                        if candidate[3] == threshold
+                        if candidate[3] >= threshold
                     ],
                 }
             )
@@ -383,7 +386,89 @@ class NERLongformerQA(pl.LightningModule):
         total_loss = []
         for batch in outputs:
             total_loss.append(batch["loss"])
+
+        doctexts_tokens, golds = read_golds_from_test_file(
+            self.dataset_path, self.tokenizer, self.cfg, filename="dev.json"
+        )
+
+        # Consolidate all the batches to single variable
+        predictions = {}
+        for batch in outputs:
+            for sample in batch["results"]:
+
+                if sample["docid"] not in predictions.keys():
+                    predictions[sample["docid"]] = {
+                        "docid": sample["docid"],
+                        "context": sample["context"],
+                        "qns": [sample["qns"]],
+                        "gold_mention": [sample["gold_mention"]],
+                        "gold": [sample["gold"]],
+                        "candidates": [sample["candidates"]],
+                    }
+                else:
+                    predictions[sample["docid"]]["qns"].append(sample["qns"])
+                    predictions[sample["docid"]]["gold_mention"].append(
+                        sample["gold_mention"]
+                    )
+                    predictions[sample["docid"]]["gold"].append(sample["gold"])
+                    predictions[sample["docid"]]["candidates"].append(
+                        sample["candidates"]
+                    )
+
+        # Convert to evaluation format
+        preds = OrderedDict()
+        for key, doc in predictions.items():
+            if key not in preds:
+                preds[key] = OrderedDict()
+                for idx, role in enumerate(self.cfg.role_map.keys()):
+                    preds[key][role] = []
+                    if idx + 1 > len(doc["candidates"]):
+                        continue
+                    elif doc["candidates"][idx]:
+
+                        filtered_candidates = doc["candidates"][idx]
+                        for candidate in filtered_candidates:
+                            if candidate[2] != "":
+                                preds[key][role] = [[candidate[2]]]
+            else:
+                print("duplicated example")
+
+        if self.cfg.debug:
+            filtered_golds = OrderedDict()
+            eval_keys = [docid for docid in preds.keys()]
+            for docid in eval_keys:
+                filtered_golds[docid] = golds[docid]
+            golds = filtered_golds
+
+        results = eval_ceaf(preds, golds, docids=list(golds.keys()))
+        print("================= CEAF score =================")
+        print(
+            "phi_strict: P: {:.2f}%,  R: {:.2f}%, F1: {:.2f}%".format(
+                results["strict"]["micro_avg"]["p"] * 100,
+                results["strict"]["micro_avg"]["r"] * 100,
+                results["strict"]["micro_avg"]["f1"] * 100,
+            )
+        )
+        print(
+            "phi_prop: P: {:.2f}%,  R: {:.2f}%, F1: {:.2f}%".format(
+                results["prop"]["micro_avg"]["p"] * 100,
+                results["prop"]["micro_avg"]["r"] * 100,
+                results["prop"]["micro_avg"]["f1"] * 100,
+            )
+        )
+        print("==============================================")
+
+        # preds_list = [{**doc, "docid": key} for key, doc in preds.items()]
+
+        write_json("./validation_predictions.json", predictions)
+        self.task.upload_artifact(
+            name="val_predictions", artifact_object="./validation_predictions.json"
+        )
+
         self.log("val_loss", sum(total_loss) / len(total_loss))
+        self.log("val_precision", results["prop"]["micro_avg"]["p"] * 100)
+        self.log("val_recall", results["prop"]["micro_avg"]["r"] * 100)
+        self.log("val_f1", results["prop"]["micro_avg"]["f1"] * 100)
 
     def test_step(self, batch, batch_nb):
         out = self._evaluation_step("test", batch, batch_nb)
@@ -430,14 +515,6 @@ class NERLongformerQA(pl.LightningModule):
                     if idx + 1 > len(doc["candidates"]):
                         continue
                     elif doc["candidates"][idx]:
-
-                        # if doc["candidates"][idx][0][2]!="</s>":
-                        #     filtered_candidates = set(ent_spans).intersection(set(candidate[2].replace("</s>", "").strip() for candidate in doc["candidates"][idx]))
-                        #     filtered_candidates = filtered_candidates.union(set(candidate[2].replace("</s>", "").strip() for candidate in doc["candidates"][idx]))
-                        # else:
-                        #     filtered_candidates = []
-                        # preds[key][role] = [[candidate] for candidate in filtered_candidates]
-
                         filtered_candidates = doc["candidates"][idx]
                         for candidate in filtered_candidates:
                             if candidate[2] != "":
@@ -452,7 +529,7 @@ class NERLongformerQA(pl.LightningModule):
                 filtered_golds[docid] = golds[docid]
             golds = filtered_golds
 
-        results = eval_ceaf(preds, golds)
+        results = eval_ceaf(preds, golds, docids=list(golds.keys()))
         print("================= CEAF score =================")
         print(
             "phi_strict: P: {:.2f}%,  R: {:.2f}%, F1: {:.2f}%".format(
@@ -510,12 +587,13 @@ class NERLongformerQA(pl.LightningModule):
         question_separators = (batch["input_ids"] == 2).nonzero(as_tuple=True)
         sep_indices_batch = [
             torch.masked_select(
-                question_separators[1], torch.eq(question_separators[0], batch_num)
+                question_separators[1], torch.eq(
+                    question_separators[0], batch_num)
             )[0]
             for batch_num in range(batch_size)
         ]
         question_indices_batch = [
-            [i + 1 for i, token in enumerate(tokens[1 : sep_idx + 1])]
+            [i + 1 for i, token in enumerate(tokens[1: sep_idx + 1])]
             for tokens, sep_idx in zip(batch["input_ids"], sep_indices_batch)
         ]
         batch_outputs = []
@@ -556,10 +634,10 @@ class NERLongformerQA(pl.LightningModule):
             batch_outputs.append(
                 {
                     "docid": docid,
-                    "qns": self.tokenizer.decode(tokens[1 : len(question_indices)]),
+                    "qns": self.tokenizer.decode(tokens[1: len(question_indices)]),
                     "context": self.tokenizer.decode(
                         torch.masked_select(tokens, torch.gt(attention_mask, 0))[
-                            1 + len(question_indices) :
+                            1 + len(question_indices):
                         ]
                     ),
                     "candidates": [
@@ -576,11 +654,18 @@ class NERLongformerQA(pl.LightningModule):
         """Configure the optimizer and the learning rate scheduler"""
 
         # # Freeze the model
-        # for idx, (name, parameters) in enumerate(self.base_qa_model.named_parameters()):
-        #     if idx % 2 == 0:
-        #         parameters.requires_grad = False
-        #     else:
-        #         parameters.requires_grad = True
+        for idx, (name, parameters) in enumerate(self.base_qa_model.named_parameters()):
+            if idx % 2 == 0:
+                parameters.requires_grad = False
+            else:
+                parameters.requires_grad = True
 
         optimizer = torch.optim.AdamW(self.parameters(), lr=self.cfg.lr)
-        return [optimizer]
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min'),
+                "monitor": "val_loss",
+                "frequency": 1
+            }
+        }
