@@ -42,6 +42,11 @@ def generate_questions_from_template(doc: Dict, role_map: Dict) -> List[Dict]:
 
                 has_existing_idx, existing_idx = is_existing_question(
                     natural_question, qns_ans)
+
+                if start_idx == 0 and end_idx == 0:
+                    # if it's a blank answer, 20% chance of being included into the training set
+                    continue
+
                 # Appends question-answer pair to list. if question exist, append mentions to it.
                 if has_existing_idx:
                     if (start_idx, end_idx, mention) not in qns_ans[existing_idx][1]:

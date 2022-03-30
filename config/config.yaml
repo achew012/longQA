@@ -5,22 +5,17 @@ dropout: 0.2
 max-tokens: 4000
 warmup: 1000
 num_workers: 4
-limit_val_batches: 0.005
-limit_test_batches: 0.005
-limit_train_batches: 0.002
 val_every: 0.33
 max_prediction_span: 25
 max_output_len: 128
 max_input_len: 1024
 batch_size: 8
 eval_batch_size: 8
-grad_accum: 4
 fp16: False
 grad_ckpt: True
 attention_window: 256
 num_epochs: 12
 every_n_epochs: 2
-use_entity_embeddings: False
 model_name: allenai/longformer-base-4096 #mrm8488/longformer-base-4096-finetuned-squadv2
 trained_model_path: 
 data_dir: /data
@@ -32,6 +27,11 @@ gpu: 1
 debug: False
 train: True
 test: True
+grad_accum: 4
+early_stopping: True
+checkpointing: True
+remote: True
+queue: compute
 role_map: {
     'Location': "where did the event happen?",
     'PerpInd': "who attacked the victim?",

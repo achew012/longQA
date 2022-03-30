@@ -74,21 +74,32 @@ def get_dataloader(split_name, cfg) -> DataLoader:
 
 
 def train(cfg, task) -> NERLongformerQA:
-    checkpoint_callback = pl.callbacks.ModelCheckpoint(
-        dirpath="./",
-        filename="best_ner_model",
-        monitor="val_loss",
-        mode="min",
-        save_top_k=1,
-        save_weights_only=True,
-        every_n_epochs=cfg.every_n_epochs,
-    )
+    callbacks = []
+
+    if cfg.checkpointing:
+        checkpoint_callback = ModelCheckpoint(
+            dirpath="./",
+            filename="best_ner_model",
+            monitor="val_loss",
+            mode="min",
+            save_top_k=1,
+            save_weights_only=True,
+            every_n_epochs=cfg.every_n_epochs,
+        )
+        callbacks.append(checkpoint_callback)
+
+    if cfg.early_stopping:
+        early_stop_callback = EarlyStopping(
+            monitor="val_loss", min_delta=0.00, patience=5, verbose=True, mode="min"
+        )
+        callbacks.append(early_stop_callback)
+
     train_loader = get_dataloader("train", cfg)
     val_loader = get_dataloader("dev", cfg)
 
     model = NERLongformerQA(cfg, task)
     trainer = pl.Trainer(
-        gpus=cfg.gpu, max_epochs=cfg.num_epochs, callbacks=[
+        gpus=cfg.gpu, max_epochs=cfg.num_epochs, accumulate_grad_batches=cfg.grad_accum, callbacks=[
             checkpoint_callback]
     )
     trainer.fit(model, train_loader, val_loader)
@@ -105,7 +116,16 @@ def test(cfg, model) -> List:
 @hydra.main(config_path=os.path.join("..", "config"), config_name="config")
 def hydra_main(cfg) -> float:
 
-    print("Detected config file, initiating task... {}".format(cfg))
+    pl.seed_everything(cfg.seed, workers=True)
+
+    tags = list(cfg.task_tags) + \
+        ["debug"] if cfg.debug else list(cfg.task_tags)
+    tags = (
+        tags + ["squad-pretrained"]
+        if cfg.model_name == "mrm8488/longformer-base-4096-finetuned-squadv2"
+        else tags + ["longformer-base"]
+    )
+    tags = tags + ["w_prompt_qns"] if cfg.add_prompt_qns else tags
 
     if cfg.train:
         task = Task.init(
@@ -122,9 +142,12 @@ def hydra_main(cfg) -> float:
 
     cfg_dict = OmegaConf.to_container(cfg, resolve=True)
     task.connect(cfg_dict)
-    task.set_base_docker("nvidia/cuda:11.4.0-runtime-ubuntu20.04")
-    task.execute_remotely(queue_name="compute", exit_process=True)
     cfg = get_clearml_params(task)
+    print("Detected config file, initiating task... {}".format(cfg))
+
+    if cfg.remote:
+        task.set_base_docker("nvidia/cuda:11.4.0-runtime-ubuntu20.04")
+        task.execute_remotely(queue_name=cfg.queue, exit_process=True)
 
     if cfg.train:
         model = train(cfg, task)

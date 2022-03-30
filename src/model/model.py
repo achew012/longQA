@@ -485,9 +485,18 @@ class NERLongformerQA(pl.LightningModule):
 
     def configure_optimizers(self):
         """Configure the optimizer and the learning rate scheduler"""
-        if self.cfg.use_entity_embeddings:
-            for (_, parameters) in self.span_embeds.named_parameters():
+        for idx, (name, parameters) in enumerate(self.base_qa_model.named_parameters()):
+            if idx % 2 == 0:
                 parameters.requires_grad = False
+            else:
+                parameters.requires_grad = True
 
         optimizer = torch.optim.AdamW(self.parameters(), lr=self.cfg.lr)
-        return [optimizer]
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', verbose=True),
+                "monitor": "val_loss",
+                "frequency": 1
+            }
+        }
