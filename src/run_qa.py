@@ -1,6 +1,7 @@
 from common.utils import *
 from transformers import AutoTokenizer
 from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 import pytorch_lightning as pl
 from data.data import NERDataset
 from model.model import NERLongformerQA
