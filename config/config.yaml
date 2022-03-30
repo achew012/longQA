@@ -24,6 +24,7 @@ clearml_dataset_project_name: datasets/muc4
 clearml_dataset_name: muc4-processed-post-eda-v3
 clearml_dataset_tags: ['6 Fields', 'GTT', 'processed']
 task_tags: ["zero negatives"]
+add_prompt_qns: False
 gpu: 1
 debug: False
 train: True
