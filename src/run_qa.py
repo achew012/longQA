@@ -13,7 +13,8 @@ from omegaconf import OmegaConf
 import hydra
 from clearml import Task, StorageManager, Dataset as ClearML_Dataset
 
-Task.force_requirements_env_freeze(force=True, requirements_file="requirements.txt")
+Task.force_requirements_env_freeze(
+    force=True, requirements_file="requirements.txt")
 Task.add_requirements("git+https://github.com/huggingface/datasets.git")
 Task.add_requirements("hydra-core")
 Task.add_requirements("pytorch-lightning")
@@ -52,7 +53,8 @@ def get_dataloader(split_name, cfg) -> DataLoader:
     #     os.path.join(dataset_path, "{}.json".format(split_name))
     # )
 
-    dataset_split = read_json(os.path.join(dataset_path, "{}.json".format(split_name)))
+    dataset_split = read_json(os.path.join(
+        dataset_path, "{}.json".format(split_name)))
 
     if cfg.debug:
         dataset_split = dataset_split[:25]
@@ -95,7 +97,7 @@ def train(cfg, task) -> NERLongformerQA:
 
     if cfg.early_stopping:
         early_stop_callback = EarlyStopping(
-            monitor="val_loss", min_delta=0.00, patience=4, verbose=True, mode="min"
+            monitor="val_loss", min_delta=0.00, patience=5, verbose=True, mode="min"
         )
         callbacks.append(early_stop_callback)
 
@@ -116,7 +118,8 @@ def train(cfg, task) -> NERLongformerQA:
 
 def test(cfg, model) -> List:
     test_loader = get_dataloader("test", cfg)
-    trainer = pl.Trainer(gpus=cfg.gpu, max_epochs=cfg.num_epochs, deterministic=True)
+    trainer = pl.Trainer(
+        gpus=cfg.gpu, max_epochs=cfg.num_epochs, deterministic=True)
     results = trainer.test(model, test_loader)
     return results
 
@@ -124,11 +127,10 @@ def test(cfg, model) -> List:
 @hydra.main(config_path=os.path.join("..", "config"), config_name="config")
 def hydra_main(cfg) -> float:
 
-    print("Detected config file, initiating task... {}".format(cfg))
-
     pl.seed_everything(cfg.seed, workers=True)
 
-    tags = list(cfg.task_tags) + ["debug"] if cfg.debug else list(cfg.task_tags)
+    tags = list(cfg.task_tags) + \
+        ["debug"] if cfg.debug else list(cfg.task_tags)
     tags = (
         tags + ["squad-pretrained"]
         if cfg.model_name == "mrm8488/longformer-base-4096-finetuned-squadv2"
@@ -154,6 +156,8 @@ def hydra_main(cfg) -> float:
     cfg_dict = OmegaConf.to_container(cfg, resolve=True)
     task.connect(cfg_dict)
     cfg = get_clearml_params(task)
+    print("Detected config file, initiating task... {}".format(cfg))
+
     if cfg.remote:
         task.set_base_docker("nvidia/cuda:11.4.0-runtime-ubuntu20.04")
         task.execute_remotely(queue_name=cfg.queue, exit_process=True)
@@ -163,7 +167,8 @@ def hydra_main(cfg) -> float:
 
     if cfg.test:
         if cfg.trained_model_path:
-            trained_model_path = StorageManager.get_local_copy(cfg.trained_model_path)
+            trained_model_path = StorageManager.get_local_copy(
+                cfg.trained_model_path)
             model = NERLongformerQA.load_from_checkpoint(
                 trained_model_path, cfg=cfg, task=task
             )

@@ -1,5 +1,5 @@
 seed: 1234
-lr: 1e-05
+lr: 1e-04
 dropout: 0.2
 warmup: 1000
 num_workers: 4
@@ -7,21 +7,21 @@ every_n_epochs: 5
 max_prediction_span: 25
 max_output_len: 128
 max_input_len: 1024
-batch_size: 16
+batch_size: 8
 eval_batch_size: 8
 template_size: 6
 grad_accum: 4
-fp16: False
 grad_ckpt: True
-attention_window: 256
-num_epochs: 15
+fp16: False
+attention_window: 512
+num_epochs: 20
 model_name: allenai/longformer-base-4096 #mrm8488/longformer-base-4096-finetuned-squadv2
 data_dir: /data
 output_dir: /saved_models/
 clearml_dataset_project_name: datasets/muc4
 clearml_dataset_name: muc4-processed-post-eda-v3
 clearml_dataset_tags: ["6 Fields", "GTT", "processed"]
-task_tags: []
+task_tags: ["zero negatives"]
 gpu: 1
 debug: False
 train: True

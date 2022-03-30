@@ -653,7 +653,7 @@ class NERLongformerQA(pl.LightningModule):
     def configure_optimizers(self):
         """Configure the optimizer and the learning rate scheduler"""
 
-        # # Freeze the model
+        # Freeze the model
         for idx, (name, parameters) in enumerate(self.base_qa_model.named_parameters()):
             if idx % 2 == 0:
                 parameters.requires_grad = False
@@ -664,7 +664,7 @@ class NERLongformerQA(pl.LightningModule):
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
-                "scheduler": torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min'),
+                "scheduler": torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', verbose=True),
                 "monitor": "val_loss",
                 "frequency": 1
             }

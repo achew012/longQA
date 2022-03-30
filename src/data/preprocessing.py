@@ -43,7 +43,6 @@ def generate_questions_from_template(
 ) -> List[Dict]:
 
     context = doc["doctext"]
-    # event_context = get_event_context()
 
     events = []
     for template in doc["templates"]:
@@ -51,7 +50,7 @@ def generate_questions_from_template(
         qns_ans = []
         for key in role_map.keys():
             natural_question = get_question(role_map[key].lower())
-            natural_question = random_swap(natural_question, tokenizer)
+            # natural_question = random_swap(natural_question, tokenizer)
             if natural_question:
                 if len(template[key]) > 0:
                     mention = template[key][0][0][0]
@@ -65,16 +64,24 @@ def generate_questions_from_template(
                 has_existing_idx, existing_idx = is_existing_question(
                     natural_question, qns_ans
                 )
+
+                if start_idx == 0 and end_idx == 0:
+                    # if it's a blank answer, 20% chance of being included into the training set
+                    continue
+
                 # Appends question-answer pair to list. if question exist, append mentions to it.
                 if has_existing_idx:
                     if (start_idx, end_idx, mention) not in qns_ans[existing_idx][1]:
                         qns_ans[existing_idx] = [
                             qns_ans[existing_idx][0],
-                            qns_ans[existing_idx][1] + [(start_idx, end_idx, mention)],
+                            qns_ans[existing_idx][1] +
+                            [(start_idx, end_idx, mention)],
                         ]
                 else:
-                    qns_ans.append([natural_question, [(start_idx, end_idx, mention)]])
-        events.append({"incident": incident, "question_answer_pair_list": qns_ans})
+                    qns_ans.append(
+                        [natural_question, [(start_idx, end_idx, mention)]])
+        events.append(
+            {"incident": incident, "question_answer_pair_list": qns_ans})
 
     return events
 
@@ -134,6 +141,9 @@ def convert_character_spans_to_word_spans(
             qns = question_answer_pair[0]
             answers = question_answer_pair[1]
 
+            if len(answers) == 0:
+                continue
+
             context_encodings = tokenizer(
                 qns,
                 context,
@@ -147,7 +157,7 @@ def convert_character_spans_to_word_spans(
 
             # Detect if the answer is out of the span (in which case this feature is labeled with the CLS index).
             qns_offset = sequence_ids.index(1) - 1
-            pad_start_idx = sequence_ids[sequence_ids.index(1) :].index(None)
+            pad_start_idx = sequence_ids[sequence_ids.index(1):].index(None)
             offsets_wo_pad = context_encodings["offset_mapping"][0][
                 qns_offset:pad_start_idx
             ]
@@ -182,10 +192,10 @@ def convert_character_spans_to_word_spans(
                 start_spans.append(token_span[0] + qns_offset)
                 end_spans.append(token_span[1] + qns_offset + 1)
 
-            # Limit to only one answer for aggragated questions
-            processed_dataset["gold_mentions"].append(mentions[0])
-            processed_dataset["start"].append(start_spans[0])
-            processed_dataset["end"].append(end_spans[0])
+                # Limit to only one answer for aggragated questions
+                processed_dataset["gold_mentions"].append(mentions[0])
+                processed_dataset["start"].append(start_spans[0])
+                processed_dataset["end"].append(end_spans[0])
 
     return processed_dataset
 
@@ -255,7 +265,8 @@ def process_inference_data(dataset: List[Dict], tokenizer: Any, cfg: Any) -> Dic
         processed_dataset["docid"].append(docid)
         processed_dataset["context"].append(context)
         processed_dataset["qns"].append(docid)
-        processed_dataset["input_ids"].append(context_encodings["input_ids"].squeeze(0))
+        processed_dataset["input_ids"].append(
+            context_encodings["input_ids"].squeeze(0))
         processed_dataset["attention_mask"].append(
             context_encodings["attention_mask"].squeeze(0)
         )
