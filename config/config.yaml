@@ -33,7 +33,7 @@ grad_accum: 4
 early_stopping: True
 checkpointing: True
 remote: True
-queue: compute
+queue: compute2
 role_map: {
     'Location': "where did the event happen?",
     'PerpInd': "who attacked the victim?",
