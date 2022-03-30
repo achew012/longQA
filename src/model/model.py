@@ -485,7 +485,7 @@ class NERLongformerQA(pl.LightningModule):
 
     def configure_optimizers(self):
         """Configure the optimizer and the learning rate scheduler"""
-        for idx, (name, parameters) in enumerate(self.base_qa_model.named_parameters()):
+        for idx, (name, parameters) in enumerate(self.base_model.named_parameters()):
             if idx % 2 == 0:
                 parameters.requires_grad = False
             else:
