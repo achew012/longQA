@@ -67,7 +67,8 @@ def generate_questions_from_template(
 
                 if start_idx == 0 and end_idx == 0:
                     # if it's a blank answer, 20% chance of being included into the training set
-                    continue
+                    if random.random() < 0.95:
+                        continue
 
                 # Appends question-answer pair to list. if question exist, append mentions to it.
                 if has_existing_idx:

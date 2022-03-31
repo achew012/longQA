@@ -201,16 +201,6 @@ class NERLongformerQA(pl.LightningModule):
                 output_hidden_states=True,
             )
 
-            # start_logits = outputs.start_logits
-            # end_logits = outputs.end_logits
-            # ignored_index = start_logits.size(1)
-            # start_positions = start_positions.clamp(0, ignored_index)
-            # end_positions = end_positions.clamp(0, ignored_index)
-            # loss_fct = torch.nn.CrossEntropyLoss(ignore_index=ignored_index)
-            # start_loss = loss_fct(start_logits, start_positions)
-            # end_loss = loss_fct(end_logits, end_positions)
-            # total_loss = (start_loss + end_loss) / 2
-
         else:
             outputs = self.base_qa_model(
                 input_ids=input_ids,

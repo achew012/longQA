@@ -1,5 +1,5 @@
 seed: 1234
-lr: 1e-04
+lr: 1e-05
 dropout: 0.2
 warmup: 1000
 num_workers: 4
@@ -7,7 +7,7 @@ every_n_epochs: 5
 max_prediction_span: 25
 max_output_len: 128
 max_input_len: 1024
-batch_size: 8
+batch_size: 16
 eval_batch_size: 8
 template_size: 6
 grad_accum: 4
@@ -26,11 +26,11 @@ gpu: 1
 debug: False
 train: True
 test: True
-remote: True
+remote: False
 early_stopping: True
 checkpointing: True
 trained_model_path: 
-queue: compute2
+queue: compute
 add_prompt_qns: False
 role_map: {
     'Location': "where did the event happen?",
