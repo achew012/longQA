@@ -26,12 +26,12 @@ gpu: 1
 debug: False
 train: True
 test: True
-remote: False
+remote: True
 early_stopping: True
 checkpointing: True
 trained_model_path: 
 queue: compute
-add_prompt_qns: False
+add_prompt_qns: True
 role_map: {
     'Location': "where did the event happen?",
     'PerpInd': "who attacked the victim?",
