@@ -61,8 +61,7 @@ def get_dataloader(split_name, cfg) -> DataLoader:
             dataset,
             batch_size=cfg.eval_batch_size,
             num_workers=cfg.num_workers,
-            collate_fn=NERDataset.collate_fn,
-            shuffle=True
+            collate_fn=NERDataset.collate_fn
         )
     else:
         return DataLoader(
@@ -100,8 +99,7 @@ def train(cfg, task) -> NERLongformerQA:
 
     model = NERLongformerQA(cfg, task)
     trainer = pl.Trainer(
-        gpus=cfg.gpu, max_epochs=cfg.num_epochs, accumulate_grad_batches=cfg.grad_accum, callbacks=[
-            checkpoint_callback]
+        gpus=cfg.gpu, max_epochs=cfg.num_epochs, accumulate_grad_batches=cfg.grad_accum, callbacks=callbacks
     )
     trainer.fit(model, train_loader, val_loader)
     return model
