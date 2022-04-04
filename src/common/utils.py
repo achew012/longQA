@@ -221,7 +221,8 @@ def read_golds_from_test_file(data_dir, tokenizer, cfg, filename="test.json"):
                             #     template[role].append([start, end])
                             entity = []
                             for mention_offset_pair in entity_raw:
-                                entity.append(mention_offset_pair[0])
+                                if mention_offset_pair[0][0] != "":
+                                    entity.append(mention_offset_pair[0])
                             if len(entity) > 0:
                                 template[role].append(entity)
                             else:

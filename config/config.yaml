@@ -23,7 +23,7 @@ clearml_dataset_name: muc4-processed-post-eda-v3
 clearml_dataset_tags: ["6 Fields", "GTT", "processed"]
 task_tags: ["zero negatives"]
 gpu: 1
-debug: True
+debug: False
 train: True
 test: True
 remote: True
