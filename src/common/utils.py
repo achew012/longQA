@@ -8,51 +8,70 @@ from typing import List, Dict, Any, Tuple
 
 
 def to_jsonl(filename: str, file_obj):
-    resultfile = open(filename, 'wb')
+    resultfile = open(filename, "wb")
     writer = jsonlines.Writer(resultfile)
     writer.write_all(file_obj)
 
 
 def read_json(jsonfile):
-    with open(jsonfile, 'rb') as file:
+    with open(jsonfile, "rb") as file:
         file_object = [json.loads(sample) for sample in file]
     return file_object
 
 
 def write_json(filename, file_object):
-    with open(filename, 'w') as file:
+    with open(filename, "w") as file:
         file.write(json.dumps(file_object))
 
 
 def read_json_multiple_templates(jsonfile):
-    with open(jsonfile, 'rb') as file:
+    with open(jsonfile, "rb") as file:
         file_object = [json.loads(sample) for sample in file]
 
         for i in range(len(file_object)):
-            if len(file_object[i]['templates']) > 0:
-                file_object[i]['templates'] = file_object[i]['templates'][0]
-                del file_object[i]['templates']['incident_type']
+            if len(file_object[i]["templates"]) > 0:
+                file_object[i]["templates"] = file_object[i]["templates"][0]
+                del file_object[i]["templates"]["incident_type"]
             else:
-                file_object[i]['templates'] = {"Location": [], "PerpInd": [], "PerpOrg": [], "PhysicalTarget": [], "Weapon": [], "HumTargetCivilian": [], "HumTargetGovOfficial": [], "HumTargetMilitary": [
-                ], "HumTargetPoliticalFigure": [], "HumTargetLegal": [], "HumTargetOthers": [], "KIASingle": [], "KIAPlural": [], "KIAMultiple": [], "WIASingle": [], "WIAPlural": [], "WIAMultiple": []}
+                file_object[i]["templates"] = {
+                    "Location": [],
+                    "PerpInd": [],
+                    "PerpOrg": [],
+                    "PhysicalTarget": [],
+                    "Weapon": [],
+                    "HumTargetCivilian": [],
+                    "HumTargetGovOfficial": [],
+                    "HumTargetMilitary": [],
+                    "HumTargetPoliticalFigure": [],
+                    "HumTargetLegal": [],
+                    "HumTargetOthers": [],
+                    "KIASingle": [],
+                    "KIAPlural": [],
+                    "KIAMultiple": [],
+                    "WIASingle": [],
+                    "WIAPlural": [],
+                    "WIAMultiple": [],
+                }
     return file_object
 
 
 def normalize_answer(s):
     """Lower text and remove punctuation, articles and extra whitespace."""
+
     def remove_articles(text):
-        regex = re.compile(r'\b(a|an|the)\b', re.UNICODE)
-        return re.sub(regex, ' ', text)
+        regex = re.compile(r"\b(a|an|the)\b", re.UNICODE)
+        return re.sub(regex, " ", text)
 
     def white_space_fix(text):
-        return ' '.join(text.split())
+        return " ".join(text.split())
 
     def remove_punc(text):
         exclude = set(string.punctuation)
-        return ''.join(ch for ch in text if ch not in exclude)
+        return "".join(ch for ch in text if ch not in exclude)
 
     def lower(text):
         return text.lower()
+
     return white_space_fix(remove_articles(remove_punc(lower(s))))
 
 
@@ -172,10 +191,13 @@ def read_golds_from_test_file(data_dir, tokenizer, cfg, filename="test.json"):
     raw_gold_file = read_json(file_path)
     # raw_gold_incidents = {incident['docid']: incident
     #                       for incident in raw_gold_file}
-    raw_gold_tokens = {incident['docid']: tokenizer.tokenize(incident["doctext"])
-                       for incident in raw_gold_file}
-    raw_gold_templates = {incident['docid']: incident["templates"]
-                          for incident in raw_gold_file}
+    raw_gold_tokens = {
+        incident["docid"]: tokenizer.tokenize(incident["doctext"])
+        for incident in raw_gold_file
+    }
+    raw_gold_templates = {
+        incident["docid"]: incident["templates"] for incident in raw_gold_file
+    }
 
     default_template = OrderedDict()
     for key in cfg.role_map.keys():

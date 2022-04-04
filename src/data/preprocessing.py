@@ -39,8 +39,8 @@ def process_qa(batch):
     answer_list = []
     for idx, doc_tokens in enumerate(batch["input_ids"]):
         answer_ids = doc_tokens[start_scores[idx] : end_scores[idx] + 1]
-        answer = qa_tokenizer.decode(answer_ids, skip_special_tokens=True)
-        answer_list.append(answer)
+        answer = qa_tokenizer.decode(answer_ids[:25], skip_special_tokens=True)
+        answer_list.append(answer.split("?")[-1])
     return answer_list
 
 
@@ -57,7 +57,7 @@ def get_question(role: str, event_mention: str) -> str:
     elif "injured" in role:
         new_role = "wia"
 
-    role = f"{role} in {event_mention}"
+    role = f"{role[:-1]} in {event_mention}?"
 
     return role
 
@@ -109,8 +109,7 @@ def generate_questions_from_template(
 
                 if start_idx == 0 and end_idx == 0:
                     # if it's a blank answer, 20% chance of being included into the training set
-                    if random.random() < 0.95:
-                        continue
+                    continue
 
                 # Appends question-answer pair to list. if question exist, append mentions to it.
                 if has_existing_idx:
