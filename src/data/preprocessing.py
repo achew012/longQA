@@ -50,18 +50,14 @@ def ask(generated_question: str, context: list):
     return answer
 
 
-def get_question(role: str, context: str, use_trigger_qns: bool = False):
+def get_question(role: str, event_mention: str) -> str:
     if "deaths" in role:
-        role = "kia"
-        return role
+        new_role = "kia"
 
     elif "injured" in role:
-        role = "wia"
-        return role
+        new_role = "wia"
 
-    if use_trigger_qns:
-        trigger_answer = ask("what is the trigger?", [context])
-        role = f"{role} in {trigger_answer}"
+    role = f"{role} in {event_mention}"
 
     return role
 
@@ -85,7 +81,7 @@ def random_swap(input_qns: str, tokenizer: Any, chance: float = 0.0):
 
 
 def generate_questions_from_template(
-    doc: Dict, role_map: Dict, tokenizer: object, cfg: OmegaConf
+    doc: Dict, event_mention: str, role_map: Dict, tokenizer: object
 ) -> List[Dict]:
 
     context = doc["doctext"]
@@ -95,9 +91,7 @@ def generate_questions_from_template(
         incident = template.pop("incident_type", None)
         qns_ans = []
         for key in role_map.keys():
-            natural_question = get_question(
-                role_map[key].lower(), context, use_trigger_qns=cfg.add_prompt_qns
-            )
+            natural_question = get_question(role_map[key].lower(), event_mention)
             # natural_question = random_swap(natural_question, tokenizer)
             if natural_question:
                 if len(template[key]) > 0:
@@ -127,6 +121,7 @@ def generate_questions_from_template(
                         ]
                 else:
                     qns_ans.append([natural_question, [(start_idx, end_idx, mention)]])
+
         events.append({"incident": incident, "question_answer_pair_list": qns_ans})
 
     return events
@@ -246,6 +241,21 @@ def convert_character_spans_to_word_spans(
     return processed_dataset
 
 
+def get_prompt_qns(dataset: List[Dict], cfg: OmegaConf) -> List[str]:
+    def chunks(lst: list, batch_size: int):
+        """Yield successive n-sized chunks from lst."""
+        for i in range(0, len(lst), batch_size):
+            yield lst[i : i + batch_size]
+
+    question_list = []
+    batches = chunks(dataset, cfg.batch_size)
+    for batch in tqdm(batches):
+        context_batch = [doc["doctext"] for doc in batch]
+        question_list += ask("what is the trigger?", context_batch)
+
+    return question_list
+
+
 def process_train_data(dataset: List[Dict], tokenizer: Any, cfg: Any) -> Dict:
     role_map = cfg.role_map
 
@@ -265,8 +275,12 @@ def process_train_data(dataset: List[Dict], tokenizer: Any, cfg: Any) -> Dict:
         f"Preprocessing Dataset {'with Additional Prompt Questions' if cfg.add_prompt_qns else '...'}"
     )
 
-    for doc in tqdm(dataset):
-        events = generate_questions_from_template(doc, role_map, tokenizer, cfg)
+    event_list = get_prompt_qns(dataset, cfg)
+
+    for doc, event_mention in zip(dataset, event_list):
+        events = generate_questions_from_template(
+            doc, event_mention, role_map, tokenizer
+        )
         processed_dataset = convert_character_spans_to_word_spans(
             processed_dataset, doc, events, tokenizer, cfg
         )
