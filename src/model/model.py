@@ -288,6 +288,89 @@ class NERLongformerQA(pl.LightningModule):
             total_loss.append(batch["loss"])
         self.log("val_loss", sum(total_loss) / len(total_loss))
 
+        doctexts_tokens, golds = read_golds_from_test_file(
+            self.dataset_path, self.tokenizer, self.cfg, filename="dev.json"
+        )
+
+        # Consolidate all the batches to single variable
+        predictions = {}
+        for batch in outputs:
+            for sample in batch["results"]:
+
+                if sample["docid"] not in predictions.keys():
+                    predictions[sample["docid"]] = {
+                        "docid": sample["docid"],
+                        "context": sample["context"],
+                        "qns": [sample["qns"]],
+                        "gold_mention": [sample["gold_mention"]],
+                        "gold": [sample["gold"]],
+                        "candidates": [sample["candidates"]],
+                    }
+                else:
+                    predictions[sample["docid"]]["qns"].append(sample["qns"])
+                    predictions[sample["docid"]]["gold_mention"].append(
+                        sample["gold_mention"]
+                    )
+                    predictions[sample["docid"]]["gold"].append(sample["gold"])
+                    predictions[sample["docid"]]["candidates"].append(
+                        sample["candidates"]
+                    )
+
+        # Convert to evaluation format
+        preds = OrderedDict()
+        for key, doc in predictions.items():
+            if key not in preds:
+                preds[key] = OrderedDict()
+                for idx, role in enumerate(self.cfg.role_map.keys()):
+                    preds[key][role] = []
+                    if idx + 1 > len(doc["candidates"]):
+                        continue
+                    elif doc["candidates"][idx]:
+
+                        filtered_candidates = doc["candidates"][idx]
+                        for candidate in filtered_candidates:
+                            if candidate[2] != "":
+                                preds[key][role] = [[candidate[2]]]
+            else:
+                print("duplicated example")
+
+        if self.cfg.debug:
+            filtered_golds = OrderedDict()
+            eval_keys = [docid for docid in preds.keys()]
+            for docid in eval_keys:
+                filtered_golds[docid] = golds[docid]
+            golds = filtered_golds
+
+        results = eval_ceaf(preds, golds, docids=list(golds.keys()))
+        print("================= CEAF score =================")
+        print(
+            "phi_strict: P: {:.2f}%,  R: {:.2f}%, F1: {:.2f}%".format(
+                results["strict"]["micro_avg"]["p"] * 100,
+                results["strict"]["micro_avg"]["r"] * 100,
+                results["strict"]["micro_avg"]["f1"] * 100,
+            )
+        )
+        print(
+            "phi_prop: P: {:.2f}%,  R: {:.2f}%, F1: {:.2f}%".format(
+                results["prop"]["micro_avg"]["p"] * 100,
+                results["prop"]["micro_avg"]["r"] * 100,
+                results["prop"]["micro_avg"]["f1"] * 100,
+            )
+        )
+        print("==============================================")
+
+        # preds_list = [{**doc, "docid": key} for key, doc in preds.items()]
+
+        write_json("./validation_predictions.json", predictions)
+        self.task.upload_artifact(
+            name="val_predictions", artifact_object="./validation_predictions.json"
+        )
+
+        self.log("val_loss", sum(total_loss) / len(total_loss))
+        self.log("val_precision", results["prop"]["micro_avg"]["p"] * 100)
+        self.log("val_recall", results["prop"]["micro_avg"]["r"] * 100)
+        self.log("val_f1", results["prop"]["micro_avg"]["f1"] * 100)
+
     def test_step(self, batch, batch_nb):
         out = self._evaluation_step("test", batch, batch_nb)
         return {"results": out["preds"]}

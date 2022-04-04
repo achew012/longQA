@@ -5,6 +5,11 @@ import json
 import os
 
 
+def write_json(filename, file_object):
+    with open(filename, 'w') as file:
+        file.write(json.dumps(file_object))
+
+
 def to_jsonl(filename: str, file_obj):
     resultfile = open(filename, 'wb')
     writer = jsonlines.Writer(resultfile)
@@ -61,9 +66,9 @@ def compute_f1(a_gold, a_pred):
     return f1
 
 
-def read_golds_from_test_file(data_dir, tokenizer, cfg):
+def read_golds_from_test_file(data_dir, tokenizer, cfg, filename="test.json"):
     golds = OrderedDict()
-    file_path = os.path.join(data_dir, "test.json")
+    file_path = os.path.join(data_dir, filename)
     raw_gold_file = read_json(file_path)
     # raw_gold_incidents = {incident['docid']: incident
     #                       for incident in raw_gold_file}
