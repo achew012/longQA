@@ -215,14 +215,9 @@ def read_golds_from_test_file(data_dir, tokenizer, cfg, filename="test.json"):
                         value = template_raw[role]
                         template[role] = []
                         for entity_raw in value:
-                            # first_mention_tokens = tokenizer.tokenize(entity[0][0])
-                            # start, end = find_sub_list(first_mention_tokens, doctext_tokens)
-                            # if start != -1 and end != -1:
-                            #     template[role].append([start, end])
                             entity = []
                             for mention_offset_pair in entity_raw:
-                                if mention_offset_pair[0][0] != "":
-                                    entity.append(mention_offset_pair[0])
+                                entity.append(mention_offset_pair[0])
                             if len(entity) > 0:
                                 template[role].append(entity)
                             else:

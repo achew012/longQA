@@ -9,15 +9,8 @@ from transformers import (
 )
 from tqdm import tqdm
 
-qa_tokenizer = AutoTokenizer.from_pretrained(
-    "mrm8488/longformer-base-4096-finetuned-squadv2"
-)
-qa_model = AutoModelForQuestionAnswering.from_pretrained(
-    "mrm8488/longformer-base-4096-finetuned-squadv2"
-)
 
-
-def format_qa_input(generated_question: str, context: list):
+def format_qa_input(generated_question: str, context: list, qa_tokenizer):
     return qa_tokenizer(
         [generated_question] * len(context),
         context,
@@ -28,7 +21,7 @@ def format_qa_input(generated_question: str, context: list):
     )
 
 
-def process_qa(batch):
+def process_qa(batch, qa_model, qa_tokenizer):
     outputs = qa_model(
         input_ids=batch["input_ids"], attention_mask=batch["attention_mask"]
     )
@@ -38,26 +31,27 @@ def process_qa(batch):
 
     answer_list = []
     for idx, doc_tokens in enumerate(batch["input_ids"]):
-        answer_ids = doc_tokens[start_scores[idx] : end_scores[idx] + 1]
+        answer_ids = doc_tokens[start_scores[idx]: end_scores[idx] + 1]
         answer = qa_tokenizer.decode(answer_ids[:25], skip_special_tokens=True)
         answer_list.append(answer.split("?")[-1])
     return answer_list
 
 
-def ask(generated_question: str, context: list):
-    batch_qa = format_qa_input(generated_question, context)
-    answer = process_qa(batch_qa)
+def ask(generated_question: str, context: list, qa_model, qa_tokenizer):
+    batch_qa = format_qa_input(generated_question, context, qa_tokenizer)
+    answer = process_qa(batch_qa, qa_model, qa_tokenizer)
     return answer
 
 
-def get_question(role: str, event_mention: str) -> str:
+def get_question(role: str, event_mention: str = None) -> str:
     if "deaths" in role:
-        new_role = "kia"
+        role = "kia"
 
     elif "injured" in role:
-        new_role = "wia"
+        role = "wia"
 
-    role = f"{role[:-1]} in {event_mention}?"
+    if event_mention:
+        role = f"{role[:-1]} in {event_mention}?"
 
     return role
 
@@ -81,17 +75,16 @@ def random_swap(input_qns: str, tokenizer: Any, chance: float = 0.0):
 
 
 def generate_questions_from_template(
-    doc: Dict, event_mention: str, role_map: Dict, tokenizer: object
+    doc: Dict, role_map: Dict, tokenizer: object, event_mention: str = None
 ) -> List[Dict]:
-
-    context = doc["doctext"]
 
     events = []
     for template in doc["templates"]:
         incident = template.pop("incident_type", None)
         qns_ans = []
         for key in role_map.keys():
-            natural_question = get_question(role_map[key].lower(), event_mention)
+            natural_question = get_question(
+                role_map[key].lower(), event_mention)
             # natural_question = random_swap(natural_question, tokenizer)
             if natural_question:
                 if len(template[key]) > 0:
@@ -107,21 +100,24 @@ def generate_questions_from_template(
                     natural_question, qns_ans
                 )
 
-                if start_idx == 0 and end_idx == 0:
-                    # if it's a blank answer, 20% chance of being included into the training set
-                    continue
+                # if start_idx == 0 and end_idx == 0:
+                #     # if it's a blank answer, 20% chance of being included into the training set
+                #     continue
 
                 # Appends question-answer pair to list. if question exist, append mentions to it.
                 if has_existing_idx:
                     if (start_idx, end_idx, mention) not in qns_ans[existing_idx][1]:
                         qns_ans[existing_idx] = [
                             qns_ans[existing_idx][0],
-                            qns_ans[existing_idx][1] + [(start_idx, end_idx, mention)],
+                            qns_ans[existing_idx][1] +
+                            [(start_idx, end_idx, mention)],
                         ]
                 else:
-                    qns_ans.append([natural_question, [(start_idx, end_idx, mention)]])
+                    qns_ans.append(
+                        [natural_question, [(start_idx, end_idx, mention)]])
 
-        events.append({"incident": incident, "question_answer_pair_list": qns_ans})
+        events.append(
+            {"incident": incident, "question_answer_pair_list": qns_ans})
 
     return events
 
@@ -168,8 +164,10 @@ def convert_char_indices(
 
 
 def convert_character_spans_to_word_spans(
-    processed_dataset: Dict, doc: Dict, events: List[Dict], tokenizer: Any, cfg: Any
+    processed_dataset: List, doc: Dict, events: List[Dict], tokenizer: Any, cfg: Any
 ) -> Dict:
+
+    processed_sample = {}
     docid = doc["docid"]
     context = doc["doctext"]
 
@@ -197,27 +195,30 @@ def convert_character_spans_to_word_spans(
 
             # Detect if the answer is out of the span (in which case this feature is labeled with the CLS index).
             qns_offset = sequence_ids.index(1) - 1
-            pad_start_idx = sequence_ids[sequence_ids.index(1) :].index(None)
+            pad_start_idx = sequence_ids[sequence_ids.index(1):].index(None)
             offsets_wo_pad = context_encodings["offset_mapping"][0][
                 qns_offset:pad_start_idx
             ]
             context_mask = context_encodings["attention_mask"]
             context_mask[0][: qns_offset + 1] = 0
 
-            processed_dataset["docid"].append(docid)
-            processed_dataset["context"].append(context)
-            processed_dataset["input_ids"].append(
-                context_encodings["input_ids"].squeeze(0)
-            )
-            processed_dataset["attention_mask"].append(
-                context_encodings["attention_mask"].squeeze(0)
-            )
-            processed_dataset["context_mask"].append(context_mask.squeeze(0))
-            processed_dataset["qns"].append(qns)
+            processed_sample["docid"] = docid
+            processed_sample["context"] = context
+            processed_sample["input_ids"] = context_encodings["input_ids"].squeeze(
+                0)
+
+            processed_sample["attention_mask"] = context_encodings["attention_mask"].squeeze(
+                0)
+            processed_sample["context_mask"] = context_mask.squeeze(0)
+            processed_sample["qns"] = qns
 
             mentions = []
             start_spans = []
             end_spans = []
+
+            processed_sample["gold_mentions"] = []
+            processed_sample["start"] = []
+            processed_sample["end"] = []
 
             for ans_char_start, ans_char_end, mention in answers:
 
@@ -233,56 +234,65 @@ def convert_character_spans_to_word_spans(
                 end_spans.append(token_span[1] + qns_offset + 1)
 
                 # Limit to only one answer for aggragated questions
-                processed_dataset["gold_mentions"].append(mentions[0])
-                processed_dataset["start"].append(start_spans[0])
-                processed_dataset["end"].append(end_spans[0])
+                processed_sample["gold_mentions"].append(mentions[0])
+                processed_sample["start"].append(start_spans[0])
+                processed_sample["end"].append(end_spans[0])
 
+            processed_dataset.append(processed_sample)
     return processed_dataset
 
 
 def get_prompt_qns(dataset: List[Dict], cfg: OmegaConf) -> List[str]:
+    qa_tokenizer = AutoTokenizer.from_pretrained(
+        "mrm8488/longformer-base-4096-finetuned-squadv2"
+    )
+
+    qa_model = AutoModelForQuestionAnswering.from_pretrained(
+        "mrm8488/longformer-base-4096-finetuned-squadv2"
+    )
+
     def chunks(lst: list, batch_size: int):
         """Yield successive n-sized chunks from lst."""
         for i in range(0, len(lst), batch_size):
-            yield lst[i : i + batch_size]
+            yield lst[i: i + batch_size]
 
     question_list = []
     batches = chunks(dataset, cfg.batch_size)
     for batch in tqdm(batches):
         context_batch = [doc["doctext"] for doc in batch]
-        question_list += ask("what is the trigger?", context_batch)
+        question_list += ask("what is the trigger?",
+                             context_batch, qa_model, qa_tokenizer)
 
     return question_list
 
 
-def process_train_data(dataset: List[Dict], tokenizer: Any, cfg: Any) -> Dict:
+def process_train_data(dataset: List[Dict], tokenizer: Any, cfg: Any) -> List:
     role_map = cfg.role_map
 
-    processed_dataset = {
-        "docid": [],
-        "context": [],
-        "input_ids": [],
-        "attention_mask": [],
-        "context_mask": [],
-        "qns": [],
-        "gold_mentions": [],
-        "start": [],
-        "end": [],
-    }
+    processed_dataset = []
 
     print(
         f"Preprocessing Dataset {'with Additional Prompt Questions' if cfg.add_prompt_qns else '...'}"
     )
 
-    event_list = get_prompt_qns(dataset, cfg)
+    if cfg.add_prompt_qns:
+        event_list = get_prompt_qns(dataset, cfg)
 
-    for doc, event_mention in zip(dataset, event_list):
-        events = generate_questions_from_template(
-            doc, event_mention, role_map, tokenizer
-        )
-        processed_dataset = convert_character_spans_to_word_spans(
-            processed_dataset, doc, events, tokenizer, cfg
-        )
+        for doc, event_mention in zip(dataset, event_list):
+            events = generate_questions_from_template(
+                doc, role_map, tokenizer, event_mention
+            )
+            processed_dataset = convert_character_spans_to_word_spans(
+                processed_dataset, doc, events, tokenizer, cfg
+            )
+    else:
+        for doc in dataset:
+            events = generate_questions_from_template(
+                doc, role_map, tokenizer
+            )
+            processed_dataset = convert_character_spans_to_word_spans(
+                processed_dataset, doc, events, tokenizer, cfg
+            )
 
     return processed_dataset
 
@@ -291,17 +301,7 @@ def process_inference_data(dataset: List[Dict], tokenizer: Any, cfg: Any) -> Dic
 
     role_map = cfg.role_map
 
-    processed_dataset = {
-        "docid": [],
-        "context": [],
-        "qns": [],
-        "input_ids": [],
-        "attention_mask": [],
-        "context_mask": [],
-        # "gold_mentions": [],
-        # "start": [],
-        # "end": []
-    }
+    processed_dataset = []
 
     for doc in dataset:
         docid = doc["docid"]
@@ -317,6 +317,7 @@ def process_inference_data(dataset: List[Dict], tokenizer: Any, cfg: Any) -> Dic
             return_tensors="pt",
         )
 
+        processed_sample = {}
         sequence_ids = context_encodings.sequence_ids()
         qns_offset = sequence_ids.index(1) - 1
         # pad_start_idx = sequence_ids[sequence_ids.index(
@@ -325,13 +326,14 @@ def process_inference_data(dataset: List[Dict], tokenizer: Any, cfg: Any) -> Dic
         context_mask = context_encodings["attention_mask"]
         context_mask[0][:qns_offset] = 0
 
-        processed_dataset["docid"].append(docid)
-        processed_dataset["context"].append(context)
-        processed_dataset["qns"].append(docid)
-        processed_dataset["input_ids"].append(context_encodings["input_ids"].squeeze(0))
-        processed_dataset["attention_mask"].append(
-            context_encodings["attention_mask"].squeeze(0)
-        )
-        processed_dataset["context_mask"].append(context_mask.squeeze(0))
+        processed_sample["docid"] = docid
+        processed_sample["context"] = context
+        processed_sample["qns"] = docid
+        processed_sample["input_ids"] = context_encodings["input_ids"].squeeze(
+            0)
+        processed_sample["attention_mask"] = context_encodings["attention_mask"].squeeze(
+            0)
+        processed_sample["context_mask"] = context_mask.squeeze(0)
+        processed_dataset.append(processed_sample)
 
     return processed_dataset

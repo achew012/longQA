@@ -19,6 +19,21 @@ from clearml import Dataset as ClearML_Dataset
 import ipdb
 
 
+class WeightedFocalLoss(nn.modules.loss._WeightedLoss):
+    def __init__(self, alpha=None, gamma=2, reduction='none'):
+        super(WeightedFocalLoss, self).__init__(alpha, reduction=reduction)
+        self.gamma = gamma
+        # weight parameter will act as the alpha parameter to balance class weights
+        self.weight = alpha
+
+    def forward(self, input, target):
+        ce_loss = torch.nn.functional.cross_entropy(input, target.type(
+            torch.cuda.LongTensor), reduction=self.reduction, weight=self.weight)
+        pt = torch.exp(-ce_loss)
+        focal_loss = ((1 - pt) ** self.gamma * ce_loss).mean()
+        return focal_loss
+
+
 class NERLongformerQA(pl.LightningModule):
     """Pytorch Lightning module. It wraps up the model, data loading and training code"""
 
@@ -100,99 +115,19 @@ class NERLongformerQA(pl.LightningModule):
 
         return global_attention_mask
 
-    def get_event_embeddings(
-        self, input_ids: torch.tensor, context_mask: torch.tensor
-    ) -> torch.tensor:
-        context_mask = context_mask > 0
-        context = self.tokenizer.decode(
-            torch.masked_select(input_ids, context_mask), skip_special_tokens=True
-        )
-        event_encodings = self.tokenizer(
-            "what happened?",
-            context,
-            padding="max_length",
-            truncation=True,
-            max_length=self.cfg.max_input_len,
-            return_tensors="pt",
-        )
-        event_encodings = event_encodings.to(self.device)
-        event_outputs = self.base_qa_model(
-            input_ids=event_encodings["input_ids"],
-            attention_mask=event_encodings["attention_mask"],
-            output_hidden_states=True,
-        )
-        event_embeddings = event_outputs.hidden_states[-1]
-        return event_embeddings
-
-    def sequence_selection_module(
-        self, input_ids, attention_mask, event_embeddings, context_mask
-    ):
-        indices_first_interval = torch.tensor([0, 1, 2]).to(self.device)
-        indices_second_interval = torch.tensor([3, 4, 5]).to(self.device)
-        input_ids_first_interval = torch.index_select(
-            input_ids, 0, indices_first_interval
-        )
-        attention_mask_first_interval = torch.index_select(
-            attention_mask, 0, indices_first_interval
-        )
-
-        input_ids_second_interval = torch.index_select(
-            input_ids, 0, indices_second_interval
-        )
-        attention_mask_second_interval = torch.index_select(
-            attention_mask, 0, indices_second_interval
-        )
-
-        single_layer = self.base_qa_model(
-            input_ids=input_ids_first_interval,
-            attention_mask=attention_mask_first_interval,  # mask padding tokens
-            output_hidden_states=True,
-        )
-        start_logits = single_layer.start_logits
-        end_logits = single_layer.end_logits
-
-        candidate_start_tokens = torch.topk(start_logits, 5).indices
-        candidate_end_tokens = torch.topk(start_logits, 5).indices
-
-        span_embeds = torch.matmul(
-            self.history_embedding(candidate_start_tokens),
-            torch.transpose(self.history_embedding(
-                candidate_end_tokens), 1, 2),
-        )
-        # redefine the batches
-        # Take different sequence length and order and add the embeddings
-        return None
-
     def forward(self, **batch):
         input_ids, attention_mask = (
             batch["input_ids"],
             batch["attention_mask"],
         )
 
-        # input_embeds
-        # qa_embeddings = self.base_qa_model.longformer.embeddings(input_ids)
-        # if self.cfg.add_prompt_qns:
-        #     # what is the event that happened?
-        #     event_embeddings = self.get_event_embeddings(
-        #         input_ids, batch["context_mask"]
-        #     )
-        #     # combine input_embeds with event embeds
-        #     combined_embeddings = torch.add(qa_embeddings, event_embeddings)
-        # else:
-        #     combined_embeddings = qa_embeddings
-
-        # Add a new init history embedding here
-        # Randomly generate different sequences of conversations
-        # combined_embeddings = self.sequence_selection_module(
-        #     input_ids, attention_mask, event_embeddings, batch["context_mask"])
-
+        total_loss = None
         if "start_positions" in batch.keys() and "end_positions" in batch.keys():
 
             start_positions, end_positions = batch["start_positions"], batch["end_positions"]
 
             outputs = self.base_qa_model(
                 input_ids=input_ids,
-                # inputs_embeds=combined_embeddings,
                 attention_mask=attention_mask,  # mask padding tokens
                 global_attention_mask=self._set_global_attention_mask(
                     input_ids),
@@ -201,10 +136,30 @@ class NERLongformerQA(pl.LightningModule):
                 output_hidden_states=True,
             )
 
+            # If we are on multi-GPU, split add a dimension
+            if len(start_positions.size()) > 1:
+                start_positions = start_positions.squeeze(-1)
+            if len(end_positions.size()) > 1:
+                end_positions = end_positions.squeeze(-1)
+            # sometimes the start/end positions are outside our model inputs, we ignore these terms
+            ignored_index = outputs.start_logits.size(1)
+            start_positions = start_positions.clamp(0, ignored_index)
+            end_positions = end_positions.clamp(0, ignored_index)
+
+            #loss_fct = torch.nn.CrossEntropyLoss(ignore_index=ignored_index)
+            loss_fct = WeightedFocalLoss(gamma=10)
+
+            start_loss = loss_fct(outputs.start_logits, start_positions)
+            end_loss = loss_fct(outputs.end_logits, end_positions)
+            total_loss = (start_loss + end_loss) / 2
+
+            print(
+                f"total_loss: {total_loss}, start_loss: {start_loss}, end_loss: {end_loss}")
+            outputs.loss = total_loss
+
         else:
             outputs = self.base_qa_model(
                 input_ids=input_ids,
-                # inputs_embeds=combined_embeddings,
                 attention_mask=attention_mask,  # mask padding tokens
             )
 
@@ -338,7 +293,7 @@ class NERLongformerQA(pl.LightningModule):
             score_list = [candidate[3] for candidate in valid_candidates]
 
             # top_5 = sorted(score_list, reverse=True)[:5]
-            threshold = max(score_list) if len(score_list) > 0 else 0
+            threshold = max(score_list)  # if len(score_list) > 0 else 0
 
             batch_outputs.append(
                 {

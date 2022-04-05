@@ -18,18 +18,6 @@ tag2role = OrderedDict(
         "phys_tgt_id": "PhysicalTarget",
         "incident_instrument_id": "Weapon",
         "human_target": "HumTarget"
-        # 'hum_tgt_type_civilian': 'HumTargetCivilian',
-        # 'hum_tgt_type_gov_official': 'HumTargetGovOfficial',
-        # 'hum_tgt_type_military': 'HumTargetMilitary',
-        # 'hum_tgt_type_political_figure': 'HumTargetPoliticalFigure',
-        # 'hum_tgt_type_legal': 'HumTargetLegal',
-        # 'hum_tgt_type_others': 'HumTargetOthers',
-        # 'hum_tgt_kia_single': 'KIASingle',
-        # 'hum_tgt_kia_plural': 'KIAPlural',
-        # 'hum_tgt_kia_multiple': 'KIAMultiple',
-        # 'hum_tgt_wia_single': 'WIASingle',
-        # 'hum_tgt_wia_plural': 'WIAPlural',
-        # 'hum_tgt_wia_multiple': 'WIAMultiple'
     }
 )
 
@@ -126,7 +114,8 @@ def eval_ceaf_base(
                         pred_c.append(mention)
                     pred_clusters.append(pred_c)
 
-                pn, pd, rn, rd = ceaf(pred_clusters, gold_clusters, phi_similarity)
+                pn, pd, rn, rd = ceaf(
+                    pred_clusters, gold_clusters, phi_similarity)
                 result[role]["p_num"] += pn
                 result[role]["p_den"] += pd
                 result[role]["r_num"] += rn

@@ -21,20 +21,20 @@ class NERDataset(Dataset):
 
     def __len__(self):
         """Returns length of the dataset"""
-        return len(self.processed_dataset["docid"])
+        return len(self.processed_dataset)
 
     def __getitem__(self, idx):
         """Gets an example from the dataset. The input and output are tokenized and limited to a certain seqlen."""
         # item = {key: val[idx] for key, val in self.processed_dataset["encodings"].items()}
         item = {}
-        item['input_ids'] = self.processed_dataset["input_ids"][idx]
-        item['attention_mask'] = self.processed_dataset["attention_mask"][idx]
-        item['context_mask'] = self.processed_dataset["context_mask"][idx]
-        item['docid'] = self.processed_dataset["docid"][idx]
+        item['input_ids'] = self.processed_dataset[idx]["input_ids"]
+        item['attention_mask'] = self.processed_dataset[idx]["attention_mask"]
+        item['context_mask'] = self.processed_dataset[idx]["context_mask"]
+        item['docid'] = self.processed_dataset[idx]["docid"]
         if self.train:
-            item['gold_mentions'] = self.processed_dataset["gold_mentions"][idx]
-            item['start'] = torch.tensor(self.processed_dataset["start"])[idx]
-            item['end'] = torch.tensor(self.processed_dataset["end"])[idx]
+            item['gold_mentions'] = self.processed_dataset[idx]["gold_mentions"]
+            item['start'] = torch.tensor(self.processed_dataset[idx]["start"])
+            item['end'] = torch.tensor(self.processed_dataset[idx]["end"])
         return item
 
     @ staticmethod

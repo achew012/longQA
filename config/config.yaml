@@ -21,17 +21,17 @@ output_dir: /saved_models/
 clearml_dataset_project_name: datasets/muc4
 clearml_dataset_name: muc4-processed-post-eda-v3
 clearml_dataset_tags: ["6 Fields", "GTT", "processed"]
-task_tags: ["zero negatives"]
+task_tags: []
 gpu: 1
 debug: False
 train: True
 test: True
-remote: True
+remote: False
 early_stopping: True
 checkpointing: True
 trained_model_path: 
 queue: compute
-add_prompt_qns: True
+add_prompt_qns: False
 role_map: {
     'Location': "where did the event happen?",
     'PerpInd': "who attacked the victim?",
