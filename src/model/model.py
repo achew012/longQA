@@ -20,15 +20,19 @@ import ipdb
 
 
 class WeightedFocalLoss(nn.modules.loss._WeightedLoss):
-    def __init__(self, alpha=None, gamma=2, reduction='none'):
+    def __init__(self, alpha=None, gamma=2, reduction="none"):
         super(WeightedFocalLoss, self).__init__(alpha, reduction=reduction)
         self.gamma = gamma
         # weight parameter will act as the alpha parameter to balance class weights
         self.weight = alpha
 
     def forward(self, input, target):
-        ce_loss = torch.nn.functional.cross_entropy(input, target.type(
-            torch.cuda.LongTensor), reduction=self.reduction, weight=self.weight)
+        ce_loss = torch.nn.functional.cross_entropy(
+            input,
+            target.type(torch.cuda.LongTensor),
+            reduction=self.reduction,
+            weight=self.weight,
+        )
         pt = torch.exp(-ce_loss)
         focal_loss = ((1 - pt) ** self.gamma * ce_loss).mean()
         return focal_loss
@@ -55,8 +59,7 @@ class NERLongformerQA(pl.LightningModule):
         print("CUDA available: ", torch.cuda.is_available())
 
         # Load and update config then load a pretrained LEDForConditionalGeneration
-        self.base_qa_model_config = AutoConfig.from_pretrained(
-            self.cfg.model_name)
+        self.base_qa_model_config = AutoConfig.from_pretrained(self.cfg.model_name)
         self.base_qa_model_config.attention_window = self.cfg.attention_window
         # Load tokenizer and metric
         self.tokenizer = AutoTokenizer.from_pretrained(
@@ -103,15 +106,13 @@ class NERLongformerQA(pl.LightningModule):
         question_separators = (input_ids == 2).nonzero(as_tuple=True)
         sep_indices_batch = [
             torch.masked_select(
-                question_separators[1], torch.eq(
-                    question_separators[0], batch_num)
+                question_separators[1], torch.eq(question_separators[0], batch_num)
             )[0]
             for batch_num in range(batch_size)
         ]
 
         for batch_num in range(batch_size):
-            global_attention_mask[batch_num,
-                                  : sep_indices_batch[batch_num]] = 1
+            global_attention_mask[batch_num, : sep_indices_batch[batch_num]] = 1
 
         return global_attention_mask
 
@@ -124,38 +125,39 @@ class NERLongformerQA(pl.LightningModule):
         total_loss = None
         if "start_positions" in batch.keys() and "end_positions" in batch.keys():
 
-            start_positions, end_positions = batch["start_positions"], batch["end_positions"]
+            start_positions, end_positions = (
+                batch["start_positions"],
+                batch["end_positions"],
+            )
 
             outputs = self.base_qa_model(
                 input_ids=input_ids,
                 attention_mask=attention_mask,  # mask padding tokens
-                global_attention_mask=self._set_global_attention_mask(
-                    input_ids),
+                global_attention_mask=self._set_global_attention_mask(input_ids),
                 start_positions=start_positions,
                 end_positions=end_positions,
                 output_hidden_states=True,
             )
 
-            # If we are on multi-GPU, split add a dimension
-            if len(start_positions.size()) > 1:
-                start_positions = start_positions.squeeze(-1)
-            if len(end_positions.size()) > 1:
-                end_positions = end_positions.squeeze(-1)
-            # sometimes the start/end positions are outside our model inputs, we ignore these terms
-            ignored_index = outputs.start_logits.size(1)
-            start_positions = start_positions.clamp(0, ignored_index)
-            end_positions = end_positions.clamp(0, ignored_index)
+            # # If we are on multi-GPU, split add a dimension
+            # if len(start_positions.size()) > 1:
+            #     start_positions = start_positions.squeeze(-1)
+            # if len(end_positions.size()) > 1:
+            #     end_positions = end_positions.squeeze(-1)
+            # # sometimes the start/end positions are outside our model inputs, we ignore these terms
+            # ignored_index = outputs.start_logits.size(1)
+            # start_positions = start_positions.clamp(0, ignored_index)
+            # end_positions = end_positions.clamp(0, ignored_index)
 
-            #loss_fct = torch.nn.CrossEntropyLoss(ignore_index=ignored_index)
-            loss_fct = WeightedFocalLoss(gamma=10)
+            # loss_fct = WeightedFocalLoss(gamma=10)
+            # start_loss = loss_fct(outputs.start_logits, start_positions)
+            # end_loss = loss_fct(outputs.end_logits, end_positions)
+            # total_loss = (start_loss + end_loss) / 2
 
-            start_loss = loss_fct(outputs.start_logits, start_positions)
-            end_loss = loss_fct(outputs.end_logits, end_positions)
-            total_loss = (start_loss + end_loss) / 2
-
-            print(
-                f"total_loss: {total_loss}, start_loss: {start_loss}, end_loss: {end_loss}")
-            outputs.loss = total_loss
+            # print(
+            #     f"total_loss: {total_loss}, start_loss: {start_loss}, end_loss: {end_loss}"
+            # )
+            # outputs.loss = total_loss
 
         else:
             outputs = self.base_qa_model(
@@ -242,13 +244,12 @@ class NERLongformerQA(pl.LightningModule):
         question_separators = (batch["input_ids"] == 2).nonzero(as_tuple=True)
         sep_indices_batch = [
             torch.masked_select(
-                question_separators[1], torch.eq(
-                    question_separators[0], batch_num)
+                question_separators[1], torch.eq(question_separators[0], batch_num)
             )[0]
             for batch_num in range(batch_size)
         ]
         question_indices_batch = [
-            [i + 1 for i, token in enumerate(tokens[1: sep_idx + 1])]
+            [i + 1 for i, token in enumerate(tokens[1 : sep_idx + 1])]
             for tokens, sep_idx in zip(batch["input_ids"], sep_indices_batch)
         ]
         batch_outputs = []
@@ -298,11 +299,11 @@ class NERLongformerQA(pl.LightningModule):
             batch_outputs.append(
                 {
                     "docid": docid,
-                    "qns": self.tokenizer.decode(tokens[1: len(question_indices)]),
+                    "qns": self.tokenizer.decode(tokens[1 : len(question_indices)]),
                     "gold_mention": gold_mention,
                     "context": self.tokenizer.decode(
                         torch.masked_select(tokens, torch.gt(attention_mask, 0))[
-                            1 + len(question_indices):
+                            1 + len(question_indices) :
                         ],
                         skip_special_tokens=True,
                     ),
@@ -532,13 +533,12 @@ class NERLongformerQA(pl.LightningModule):
         question_separators = (batch["input_ids"] == 2).nonzero(as_tuple=True)
         sep_indices_batch = [
             torch.masked_select(
-                question_separators[1], torch.eq(
-                    question_separators[0], batch_num)
+                question_separators[1], torch.eq(question_separators[0], batch_num)
             )[0]
             for batch_num in range(batch_size)
         ]
         question_indices_batch = [
-            [i + 1 for i, token in enumerate(tokens[1: sep_idx + 1])]
+            [i + 1 for i, token in enumerate(tokens[1 : sep_idx + 1])]
             for tokens, sep_idx in zip(batch["input_ids"], sep_indices_batch)
         ]
         batch_outputs = []
@@ -579,10 +579,10 @@ class NERLongformerQA(pl.LightningModule):
             batch_outputs.append(
                 {
                     "docid": docid,
-                    "qns": self.tokenizer.decode(tokens[1: len(question_indices)]),
+                    "qns": self.tokenizer.decode(tokens[1 : len(question_indices)]),
                     "context": self.tokenizer.decode(
                         torch.masked_select(tokens, torch.gt(attention_mask, 0))[
-                            1 + len(question_indices):
+                            1 + len(question_indices) :
                         ]
                     ),
                     "candidates": [
@@ -609,8 +609,10 @@ class NERLongformerQA(pl.LightningModule):
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
-                "scheduler": torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', verbose=True),
+                "scheduler": torch.optim.lr_scheduler.ReduceLROnPlateau(
+                    optimizer, "min", verbose=True
+                ),
                 "monitor": "val_loss",
-                "frequency": 1
-            }
+                "frequency": 1,
+            },
         }
