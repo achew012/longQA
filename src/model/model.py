@@ -342,7 +342,17 @@ class NERLongformerQA(pl.LightningModule):
             golds = filtered_golds
 
         results = eval_ceaf(preds, golds, docids=list(golds.keys()))
-        print("================= CEAF score =================")
+        
+        to_jsonl("./preds_val.jsonl", preds)
+        self.task.upload_artifact(
+            name="preds_val", artifact_object="./preds_val.jsonl"
+        )
+        
+        to_jsonl("./golds_val.jsonl", golds)
+        self.task.upload_artifact(
+            name="golds_val", artifact_object="./golds_val.jsonl"
+        )
+        print("================= CEAF score validation =================")
         print(
             "phi_strict: P: {:.2f}%,  R: {:.2f}%, F1: {:.2f}%".format(
                 results["strict"]["micro_avg"]["p"] * 100,
@@ -380,12 +390,6 @@ class NERLongformerQA(pl.LightningModule):
         # gold_list = NERDataset(dataset=self.dataset["test"], tokenizer=self.tokenizer, args=self.cfg).processed_dataset["gold_mentions"]
 
         # pred_list = []
-
-        span_clf_task = self.task.get_task(
-            task_id="87a8509b524040e6bc7f52cdb8a0d0ce")
-        span_preds = read_json(
-            span_clf_task.artifacts["predictions"].get_local_copy())
-
         logs = {}
         doctexts_tokens, golds = read_golds_from_test_file(
             self.dataset_path, self.tokenizer, self.cfg
@@ -425,11 +429,11 @@ class NERLongformerQA(pl.LightningModule):
                     )
 
         preds = OrderedDict()
-        for (key, doc), ent_spans in zip(predictions.items(), span_preds):
+        for key, doc in predictions.items():
             if key not in preds:
                 preds[key] = OrderedDict()
                 for idx, role in enumerate(self.cfg.role_map.keys()):
-                    preds[key][role] = []
+                    preds[key][role] = [[]]
                     if idx + 1 > len(doc["candidates"]):
                         continue
                     elif doc["candidates"][idx]:
@@ -448,7 +452,17 @@ class NERLongformerQA(pl.LightningModule):
 
         preds_list = [{**doc, "docid": key} for key, doc in preds.items()]
         results = eval_ceaf(preds, golds)
-        print("================= CEAF score =================")
+        
+        to_jsonl("./preds_test.jsonl", preds)
+        self.task.upload_artifact(
+            name="preds_test", artifact_object="./preds_test.jsonl"
+        )
+        
+        to_jsonl("./golds_test.jsonl", golds)
+        self.task.upload_artifact(
+            name="golds_test", artifact_object="./golds_test.jsonl"
+        )
+        print("================= CEAF score test =================")
         print(
             "phi_strict: P: {:.2f}%,  R: {:.2f}%, F1: {:.2f}%".format(
                 results["strict"]["micro_avg"]["p"] * 100,

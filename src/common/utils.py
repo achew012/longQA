@@ -92,6 +92,8 @@ def read_golds_from_test_file(data_dir, tokenizer, cfg, filename="test.json"):
                     for role in cfg.role_map.keys():
                         value = template_raw[role]
                         template[role] = []
+                        if not value:
+                            template[role] = [[]]
                         for entity_raw in value:
                             # first_mention_tokens = tokenizer.tokenize(entity[0][0])
                             # start, end = find_sub_list(first_mention_tokens, doctext_tokens)

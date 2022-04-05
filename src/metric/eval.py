@@ -5,6 +5,7 @@ import json
 import argparse
 from scipy.optimize import linear_sum_assignment # https://docs.scipy.org/doc/scipy-0.18.1/reference/generated/scipy.optimize.linear_sum_assignment.html
 from collections import OrderedDict
+from common.utils import *
 
 tag2role = OrderedDict(
     {
@@ -62,6 +63,7 @@ def eval_ceaf_base(preds, golds, phi_similarity, docids=[]):
             docids.append(docid)
 
     for docid in docids:
+        print('docid: ', docid)
         if docid not in preds:
             pred = OrderedDict(
                 [
@@ -109,7 +111,7 @@ def eval_ceaf_base(preds, golds, phi_similarity, docids=[]):
         result[key]["p"] = 0 if result[key]["p_num"] == 0 else result[key]["p_num"] / float(result[key]["p_den"])
         result[key]["r"] = 0 if result[key]["r_num"] == 0 else result[key]["r_num"] / float(result[key]["r_den"])
         result[key]["f1"] = f1(result[key]["p_num"], result[key]["p_den"], result[key]["r_num"], result[key]["r_den"])
-
+    print('result: ', result)
     return result
 
 
@@ -129,6 +131,8 @@ def normalize_string(s):
 
 def eval_ceaf(preds, golds, docids=[]):
     # normalization mention strings
+    print('preds: ', preds)
+    print('golds: ', golds)
     for docid in preds:
         for role in preds[docid]:
             for idx in range(len(preds[docid][role])):
