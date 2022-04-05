@@ -26,7 +26,6 @@ def generate_questions_from_template(doc: Dict, role_map: Dict) -> List[Dict]:
     # Only take the 1st label of each role
     events = []
     for template in doc["templates"]:
-        print('docid: ', doc["docid"])
         incident = template.pop('incident_type', None)
         qns_ans = []
         for key in role_map.keys():
@@ -56,7 +55,7 @@ def generate_questions_from_template(doc: Dict, role_map: Dict) -> List[Dict]:
                 else:
                     qns_ans.append(
                         [natural_question, [(start_idx, end_idx, mention)]])
-        print('qns_ans: ', qns_ans)
+  
         events.append(
             {"incident": incident, "question_answer_pair_list": qns_ans})
 

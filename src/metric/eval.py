@@ -35,6 +35,10 @@ def phi_strict(c1, c2):
 
 def phi_prop(c1, c2):
     # # similarity: len(overlap of c2 (pred) and c1 (gold)) / len(c2)
+    if len(c2) == 0:
+        if len(c1) == 0:
+            return 1
+        return 0
     return len([m for m in c1 if m in c2]) / len(c2)
 
 def ceaf(clusters, gold_clusters, phi_similarity):
@@ -63,7 +67,6 @@ def eval_ceaf_base(preds, golds, phi_similarity, docids=[]):
             docids.append(docid)
 
     for docid in docids:
-        print('docid: ', docid)
         if docid not in preds:
             pred = OrderedDict(
                 [
@@ -131,8 +134,6 @@ def normalize_string(s):
 
 def eval_ceaf(preds, golds, docids=[]):
     # normalization mention strings
-    print('preds: ', preds)
-    print('golds: ', golds)
     for docid in preds:
         for role in preds[docid]:
             for idx in range(len(preds[docid][role])):

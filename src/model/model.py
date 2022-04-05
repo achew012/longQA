@@ -343,15 +343,6 @@ class NERLongformerQA(pl.LightningModule):
 
         results = eval_ceaf(preds, golds, docids=list(golds.keys()))
         
-        to_jsonl("./preds_val.jsonl", preds)
-        self.task.upload_artifact(
-            name="preds_val", artifact_object="./preds_val.jsonl"
-        )
-        
-        to_jsonl("./golds_val.jsonl", golds)
-        self.task.upload_artifact(
-            name="golds_val", artifact_object="./golds_val.jsonl"
-        )
         print("================= CEAF score validation =================")
         print(
             "phi_strict: P: {:.2f}%,  R: {:.2f}%, F1: {:.2f}%".format(
@@ -453,15 +444,6 @@ class NERLongformerQA(pl.LightningModule):
         preds_list = [{**doc, "docid": key} for key, doc in preds.items()]
         results = eval_ceaf(preds, golds)
         
-        to_jsonl("./preds_test.jsonl", preds)
-        self.task.upload_artifact(
-            name="preds_test", artifact_object="./preds_test.jsonl"
-        )
-        
-        to_jsonl("./golds_test.jsonl", golds)
-        self.task.upload_artifact(
-            name="golds_test", artifact_object="./golds_test.jsonl"
-        )
         print("================= CEAF score test =================")
         print(
             "phi_strict: P: {:.2f}%,  R: {:.2f}%, F1: {:.2f}%".format(
