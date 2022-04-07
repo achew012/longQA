@@ -4,6 +4,7 @@ import string
 import json
 import argparse
 
+
 # https://docs.scipy.org/doc/scipy-0.18.1/reference/generated/scipy.optimize.linear_sum_assignment.html
 from scipy.optimize import linear_sum_assignment
 from collections import OrderedDict
@@ -21,8 +22,7 @@ tag2role = OrderedDict(
     }
 )
 
-
-def f1(p_num: float, p_den: int, r_num: float, r_den: int, beta=1):
+def f1(p_num, p_den, r_num, r_den, beta=1):
     p = 0 if p_den == 0 else p_num / float(p_den)
     r = 0 if r_den == 0 else r_num / float(r_den)
     return 0 if p + r == 0 else (1 + beta * beta) * p * r / (beta * beta * p + r)
@@ -38,6 +38,10 @@ def phi_strict(c1: str, c2: str) -> int:
 
 def phi_prop(c1: str, c2: str) -> float:
     # # similarity: len(overlap of c2 (pred) and c1 (gold)) / len(c2)
+    if len(c2) == 0:
+        if len(c1) == 0:
+            return 1
+        return 0
     return len([m for m in c1 if m in c2]) / len(c2)
 
 
