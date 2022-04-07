@@ -18,6 +18,7 @@ Task.force_requirements_env_freeze(
 Task.add_requirements("git+https://github.com/huggingface/datasets.git")
 Task.add_requirements("hydra-core")
 Task.add_requirements("pytorch-lightning")
+Task.add_requirements("jsonlines")
 
 
 def get_clearml_params(task: Task) -> Dict[str, Any]:
@@ -48,7 +49,12 @@ def get_dataloader(split_name, cfg) -> DataLoader:
     )
     dataset_path = clearml_data_object.get_local_copy()
 
-    dataset_split = read_json(os.path.join(dataset_path, "{}.json".format(split_name)))
+    # dataset_split = read_json_multiple_templates(
+    #     os.path.join(dataset_path, "{}.json".format(split_name))
+    # )
+
+    dataset_split = read_json(os.path.join(
+        dataset_path, "{}.json".format(split_name)))
 
     if cfg.debug:
         dataset_split = dataset_split[:25]
@@ -59,17 +65,17 @@ def get_dataloader(split_name, cfg) -> DataLoader:
     if split_name in ["dev", "test"]:
         return DataLoader(
             dataset,
-            batch_size=cfg.eval_batch_size,
+            batch_size=cfg.template_size,
             num_workers=cfg.num_workers,
-            collate_fn=NERDataset.collate_fn
+            # shuffle=True,
         )
     else:
         return DataLoader(
             dataset,
-            batch_size=cfg.batch_size,
+            batch_size=cfg.template_size,
             num_workers=cfg.num_workers,
             collate_fn=NERDataset.collate_fn,
-            shuffle=True
+            # shuffle=True,
         )
 
 
@@ -99,7 +105,10 @@ def train(cfg, task) -> NERLongformerQA:
 
     model = NERLongformerQA(cfg, task)
     trainer = pl.Trainer(
-        gpus=cfg.gpu, max_epochs=cfg.num_epochs, accumulate_grad_batches=cfg.grad_accum, callbacks=callbacks
+        gpus=cfg.gpu,
+        max_epochs=cfg.num_epochs,
+        accumulate_grad_batches=cfg.grad_accum,
+        callbacks=callbacks,
     )
     trainer.fit(model, train_loader, val_loader)
     return model
@@ -129,14 +138,16 @@ def hydra_main(cfg) -> float:
     if cfg.train:
         task = Task.init(
             project_name="LongQA",
-            task_name="longQA-NER-train",
+            task_name="ConversationalQA-NER-train",
             output_uri="s3://experiment-logging/storage/",
+            tags=tags,
         )
     else:
         task = Task.init(
             project_name="LongQA",
-            task_name="longQA-NER-predict",
+            task_name="ConversationalQA-NER-predict",
             output_uri="s3://experiment-logging/storage/",
+            tags=tags,
         )
 
     cfg_dict = OmegaConf.to_container(cfg, resolve=True)
