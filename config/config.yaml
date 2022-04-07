@@ -26,7 +26,7 @@ gpu: 1
 debug: False
 train: True
 test: True
-remote: True
+remote: False
 early_stopping: True
 checkpointing: True
 trained_model_path: s3://experiment-logging/storage/LongQA/ConversationalQA-NER-train.cc99b9c1a5884dc0817d6461f7518ac3/models/best_ner_model.ckpt
