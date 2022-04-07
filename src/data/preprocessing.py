@@ -1,18 +1,96 @@
 from typing import List, Dict, Any, Tuple
+from omegaconf import OmegaConf
 import ipdb
 
+import torch
+from transformers import (
+    AutoTokenizer,
+    AutoModelForQuestionAnswering,
+)
+from tqdm import tqdm
 
-def get_question(role):
 
+def format_qa_input(generated_question: str, context: list, qa_tokenizer):
+    return qa_tokenizer(
+        [generated_question] * len(context),
+        context,
+        truncation=True,
+        padding="max_length",
+        max_length=1024,
+        return_tensors="pt",
+    )
+
+
+def process_qa(batch, qa_model, qa_tokenizer):
+    outputs = qa_model(
+        input_ids=batch["input_ids"], attention_mask=batch["attention_mask"]
+    )
+    start_scores, end_scores = torch.argmax(outputs.start_logits, dim=-1), torch.argmax(
+        outputs.end_logits, dim=-1
+    )
+
+    answer_list = []
+    for idx, doc_tokens in enumerate(batch["input_ids"]):
+        answer_ids = doc_tokens[start_scores[idx]: end_scores[idx] + 1]
+        answer = qa_tokenizer.decode(answer_ids[:25], skip_special_tokens=True)
+        answer_list.append(answer.split("?")[-1])
+    return answer_list
+
+
+def ask(generated_question: str, context: list, qa_model, qa_tokenizer):
+    batch_qa = format_qa_input(generated_question, context, qa_tokenizer)
+    answer = process_qa(batch_qa, qa_model, qa_tokenizer)
+    return answer
+
+
+def get_prompt_qns(dataset: List[Dict], cfg: OmegaConf) -> List[str]:
+    qa_tokenizer = AutoTokenizer.from_pretrained(
+        "mrm8488/longformer-base-4096-finetuned-squadv2"
+    )
+
+    qa_model = AutoModelForQuestionAnswering.from_pretrained(
+        "mrm8488/longformer-base-4096-finetuned-squadv2"
+    )
+
+    def chunks(lst: list, batch_size: int):
+        """Yield successive n-sized chunks from lst."""
+        for i in range(0, len(lst), batch_size):
+            yield lst[i: i + batch_size]
+
+    question_list = []
+    batches = chunks(dataset, cfg.batch_size)
+    for batch in tqdm(batches):
+        context_batch = [doc["doctext"] for doc in batch]
+        question_list += ask(
+            "what is the trigger?", context_batch, qa_model, qa_tokenizer
+        )
+
+    return question_list
+
+
+def get_question(role: str, event_mention: str = None) -> str:
     if "deaths" in role:
         role = "kia"
-        return role
 
     elif "injured" in role:
         role = "wia"
-        return role
+
+    if event_mention:
+        role = f"{role[:-1]} in {event_mention}?"
 
     return role
+
+# def get_question(role):
+
+#     if "deaths" in role:
+#         role = "kia"
+#         return role
+
+#     elif "injured" in role:
+#         role = "wia"
+#         return role
+
+#     return role
 
 
 def is_existing_question(natural_question: str, qns_ans: List) -> Tuple[bool, Any]:
@@ -22,14 +100,15 @@ def is_existing_question(natural_question: str, qns_ans: List) -> Tuple[bool, An
     return (False, -1)
 
 
-def generate_questions_from_template(doc: Dict, role_map: Dict) -> List[Dict]:
+def generate_questions_from_template(doc: Dict, role_map: Dict, tokenizer, event_mention=None) -> List[Dict]:
     # Only take the 1st label of each role
     events = []
     for template in doc["templates"]:
         incident = template.pop('incident_type', None)
         qns_ans = []
         for key in role_map.keys():
-            natural_question = get_question(role_map[key].lower())
+            natural_question = get_question(
+                role_map[key].lower(), event_mention)
             if natural_question:
                 if len(template[key]) > 0:
                     mention = template[key][0][0][0]
@@ -43,9 +122,9 @@ def generate_questions_from_template(doc: Dict, role_map: Dict) -> List[Dict]:
                 has_existing_idx, existing_idx = is_existing_question(
                     natural_question, qns_ans)
 
-                if start_idx == 0 and end_idx == 0:
-                    # if it's a blank answer, 20% chance of being included into the training set
-                    continue
+                # if start_idx == 0 and end_idx == 0:
+                #     # if it's a blank answer, 20% chance of being included into the training set
+                #     continue
 
                 # Appends question-answer pair to list. if question exist, append mentions to it.
                 if has_existing_idx:
@@ -55,7 +134,7 @@ def generate_questions_from_template(doc: Dict, role_map: Dict) -> List[Dict]:
                 else:
                     qns_ans.append(
                         [natural_question, [(start_idx, end_idx, mention)]])
-  
+
         events.append(
             {"incident": incident, "question_answer_pair_list": qns_ans})
 
@@ -127,7 +206,7 @@ def convert_character_spans_to_word_spans(processed_dataset: Dict, doc: Dict, ev
 
             # Detect if the answer is out of the span (in which case this feature is labeled with the CLS index).
             qns_offset = sequence_ids.index(1) - 1
-            pad_start_idx = sequence_ids[sequence_ids.index(1) :].index(None)
+            pad_start_idx = sequence_ids[sequence_ids.index(1):].index(None)
             offsets_wo_pad = context_encodings["offset_mapping"][0][
                 qns_offset:pad_start_idx
             ]
@@ -171,7 +250,6 @@ def convert_character_spans_to_word_spans(processed_dataset: Dict, doc: Dict, ev
 
 
 def process_train_data(dataset: List[Dict], tokenizer: Any, cfg: Any) -> Dict:
-    role_map = cfg.role_map
 
     processed_dataset = {
         "docid": [],
@@ -184,16 +262,33 @@ def process_train_data(dataset: List[Dict], tokenizer: Any, cfg: Any) -> Dict:
         "end": []
     }
 
-    for doc in dataset:
-        qns_ans = generate_questions_from_template(doc, role_map)
-        processed_dataset = convert_character_spans_to_word_spans(
-            processed_dataset, doc, qns_ans, tokenizer, cfg)
+    if cfg.add_prompt_qns:
+        event_list = get_prompt_qns(dataset, cfg)
+
+        for doc, event_mention in zip(dataset, event_list):
+            events = generate_questions_from_template(
+                doc, cfg.role_map, tokenizer, event_mention
+            )
+            processed_dataset = convert_character_spans_to_word_spans(
+                processed_dataset, doc, events, tokenizer, cfg
+            )
+    else:
+        for doc in dataset:
+            events = generate_questions_from_template(
+                doc, cfg.role_map, tokenizer)
+            processed_dataset = convert_character_spans_to_word_spans(
+                processed_dataset, doc, events, tokenizer, cfg
+            )
+
+    # for doc in dataset:
+    #     qns_ans = generate_questions_from_template(doc, cfg.role_map)
+    #     processed_dataset = convert_character_spans_to_word_spans(
+    #         processed_dataset, doc, qns_ans, tokenizer, cfg)
 
     return processed_dataset
 
 
 def process_inference_data(dataset: List[Dict], tokenizer: Any, cfg: Any) -> Dict:
-    role_map = cfg.role_map
 
     processed_dataset = {
         "docid": [],
