@@ -51,8 +51,6 @@ def ceaf(clusters, gold_clusters, phi_similarity):
     scores = np.zeros((len(gold_clusters), len(clusters)))
     for i in range(len(gold_clusters)):
         for j in range(len(clusters)):
-            if len(clusters[j]) == 0:
-                ipdb.set_trace()
             scores[i, j] = phi_similarity(gold_clusters[i], clusters[j])
     # matching = linear_assignment(-scores) # [deprecated] linear_assignment from sklearn
     # similarity = sum(scores[matching[:, 0], matching[:, 1]])
